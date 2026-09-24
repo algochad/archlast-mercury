@@ -28,8 +28,8 @@ export default defineConfig(({ mode }) => {
           name: "Archlast Mercury",
           short_name: "Mercury",
           description: "A decentralized, self-hostable chat platform",
-          theme_color: "#0a0c10",
-          background_color: "#0a0c10",
+          theme_color: "#000000",
+          background_color: "#000000",
           icons: [
             { src: "pwa-64x64.png", sizes: "64x64", type: "image/png" },
             { src: "pwa-192x192.png", sizes: "192x192", type: "image/png" },

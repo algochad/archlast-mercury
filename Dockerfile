@@ -59,15 +59,21 @@ RUN mkdir -p /data/uploads /data/files /data/certs /data/backups \
 
 USER paracord
 
-# Default environment for Docker
+# Default environment for Docker — PostgreSQL is the primary database.
+# SQLite remains available: set MERCURY_DATABASE_ENGINE=sqlite with
+# MERCURY_DATABASE_URL=sqlite:///data/mercury.db?mode=rwc.
 ENV MERCURY_BIND_ADDRESS=0.0.0.0:8090
-ENV MERCURY_DATABASE_URL=sqlite:///data/mercury.db?mode=rwc
+ENV MERCURY_DATABASE_ENGINE=postgres
+ENV MERCURY_DATABASE_URL=postgresql://mercury:changeme@postgres:5432/mercury
+ENV MERCURY_DATABASE_MAX_CONNECTIONS=50
 ENV MERCURY_STORAGE_PATH=/data/uploads
 ENV MERCURY_MEDIA_STORAGE_PATH=/data/files
 ENV MERCURY_BACKUP_DIR=/data/backups
 # Compat — PARACORD_* aliases still work via server fallback; remove in deprecation phase.
 ENV PARACORD_BIND_ADDRESS=0.0.0.0:8090
-ENV PARACORD_DATABASE_URL=sqlite:///data/mercury.db?mode=rwc
+ENV PARACORD_DATABASE_ENGINE=postgres
+ENV PARACORD_DATABASE_URL=postgresql://mercury:changeme@postgres:5432/mercury
+ENV PARACORD_DATABASE_MAX_CONNECTIONS=50
 ENV PARACORD_STORAGE_PATH=/data/uploads
 ENV PARACORD_MEDIA_STORAGE_PATH=/data/files
 ENV PARACORD_BACKUP_DIR=/data/backups

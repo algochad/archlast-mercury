@@ -19,6 +19,7 @@
 
 /** Every value `data-theme` may take. The order is the order Settings shows. */
 export const THEME_IDS = [
+  'mercury',
   'dark',
   'light',
   'amoled',
@@ -32,10 +33,10 @@ export type ThemeId = (typeof THEME_IDS)[number];
 
 /**
  * What a fresh install looks like, and what anything unrecognised collapses to.
- * The server's `DEFAULT_THEME` (crates/paracord-api/src/routes/users.rs) must
+ * The server's `DEFAULT_THEME` (crates/mercury-api/src/routes/users.rs) must
  * agree: the client adopts the server's value on first sign-in.
  */
-export const DEFAULT_THEME: ThemeId = 'voices';
+export const DEFAULT_THEME: ThemeId = 'mercury';
 
 /**
  * Is this one of ours? The server stores the theme as an opaque string and
@@ -65,7 +66,7 @@ export const LIGHT_THEMES: ReadonlySet<ThemeId> = new Set<ThemeId>(['light', 'pa
  * hue/tint are not applied — `useTheme` removes those inline properties rather
  * than writing them, and Settings shows both controls disabled with the reason.
  */
-export const LOOK_THEMES: ReadonlySet<ThemeId> = new Set<ThemeId>(['dusk', 'paper', 'voices']);
+export const LOOK_THEMES: ReadonlySet<ThemeId> = new Set<ThemeId>(['dusk', 'paper', 'voices', 'mercury']);
 
 export type MessageStyle = 'rows' | 'bubbles';
 

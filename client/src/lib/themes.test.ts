@@ -12,8 +12,9 @@ import {
 } from './themes';
 
 describe('THEME_IDS', () => {
-  it('is the four themes and the three looks, in the order Settings shows them', () => {
+  it('is Mercury plus the four themes and the three looks, in the order Settings shows them', () => {
     expect([...THEME_IDS]).toEqual([
+      'mercury',
       'dark',
       'light',
       'amoled',
@@ -23,9 +24,8 @@ describe('THEME_IDS', () => {
       'voices',
     ]);
   });
-
-  it('names Night as the default', () => {
-    expect(DEFAULT_THEME).toBe('voices');
+  it('names Mercury as the default', () => {
+    expect(DEFAULT_THEME).toBe('mercury');
     expect(THEME_IDS).toContain(DEFAULT_THEME);
   });
 });
@@ -48,10 +48,10 @@ describe('asThemeId', () => {
     expect(asThemeId('high-contrast')).toBe('high-contrast');
   });
 
-  it('collapses an unknown value to Night', () => {
-    expect(asThemeId('sepia')).toBe('voices');
-    expect(asThemeId(undefined)).toBe('voices');
-    expect(asThemeId(null)).toBe('voices');
+  it('collapses an unknown value to Mercury', () => {
+    expect(asThemeId('sepia')).toBe('mercury');
+    expect(asThemeId(undefined)).toBe('mercury');
+    expect(asThemeId(null)).toBe('mercury');
   });
 
   it('takes an explicit fallback', () => {
@@ -76,8 +76,8 @@ describe('LIGHT_THEMES', () => {
 });
 
 describe('LOOK_THEMES', () => {
-  it('is the three looks', () => {
-    expect([...LOOK_THEMES].sort()).toEqual(['dusk', 'paper', 'voices']);
+  it('is the four looks', () => {
+    expect([...LOOK_THEMES].sort()).toEqual(['dusk', 'mercury', 'paper', 'voices']);
   });
 
   it('leaves the four themes out — they keep the accent and base-colour controls', () => {

@@ -609,6 +609,165 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
 }
+/* =============================================================================
+   Mercury — black + green. Pure-black street, neon-green accent, green-tinted
+   neutrals. Same token names as Night; only values change. Light tokens stay
+   warm-white/amber (light is presence state, never recolored per §1.0).
+   ============================================================================= */
+[data-theme='mercury'] {
+  color-scheme: dark;
+
+  --sky: none;
+  --street-scrim: transparent;
+  --plate-fill: var(--bg-plate);
+  --grain: none;
+
+  /* ---- Surfaces: pure black street, green-tinted plates -------------------- */
+  --bg-base: #000000;
+  --bg-plate: oklch(16% 0.028 155);
+  --bg-raised: oklch(21% 0.035 155);
+  --bg-well: oklch(12.5% 0.022 155);
+  --bg-floating: oklch(16% 0.028 155 / 0.97);
+  --bg-mod-subtle: oklch(72% 0.17 155 / 0.08);
+  --bg-mod-strong: oklch(72% 0.17 155 / 0.16);
+  --bg-selected: oklch(72% 0.17 155 / 0.18);
+  --row-selected: var(--bg-selected);
+  --window-dark: oklch(14% 0.03 155);
+  --overlay-backdrop: oklch(8% 0.02 155 / 0.8);
+  --spoiler-bg: var(--bg-well);
+  --spoiler-bg-revealed: var(--bg-mod-strong);
+  --bg-code: var(--bg-well);
+  --border-code: var(--border-subtle);
+
+  /* ---- Light: unchanged presence semantics --------------------------------- */
+  --light-white: #f3ead8;
+  --light-amber: #f0b967;
+
+  /* ---- Text ramp: neutral-white ink (green tint would cost contrast) ------- */
+  --text-primary: oklch(95% 0.012 155);
+  --text-body-ink: oklch(87% 0.014 155);
+  --text-secondary: oklch(78% 0.02 155);
+  --text-muted: oklch(68% 0.022 155);
+  --text-faint: oklch(66% 0.02 155);
+  --text-on-light: oklch(14% 0.02 155);
+  --text-on-accent: #001208;
+  --text-on-danger: var(--accent-danger);
+  --text-link: var(--accent-primary);
+
+  /* ---- Action + semantic: neon green --------------------------------------- */
+  --accent-primary: #00e676;
+  --accent-primary-hover: #33ee8f;
+  --accent-primary-active: #00c964;
+  --accent: var(--accent-primary);
+  --accent-success: var(--accent-primary);
+  --accent-warning: #e8b23a;
+  --accent-danger: #f07c7c;
+  --accent-info: #8fa9d9;
+  --danger-well: #160f0f;
+  --danger-well-hover: #241414;
+  --accent-primary-rgb: 0, 230, 118;
+
+  /* ---- Tints --------------------------------------------------------------- */
+  --accent-tint: rgba(0, 230, 118, 0.13);
+  --accent-tint-strong: rgba(0, 230, 118, 0.2);
+  --teal-tint: rgba(143, 169, 217, 0.12);
+  --success-tint: rgba(0, 230, 118, 0.13);
+  --warning-tint: rgba(232, 178, 58, 0.14);
+  --danger-tint: rgba(240, 124, 124, 0.14);
+  --info-tint: rgba(143, 169, 217, 0.14);
+
+  /* ---- Borders + interactive ------------------------------------------------ */
+  --border-subtle: rgba(0, 230, 118, 0.12);
+  --border-strong: rgba(0, 230, 118, 0.24);
+  --channel-icon: var(--text-muted);
+  --interactive-normal: var(--text-secondary);
+  --interactive-hover: var(--text-primary);
+  --interactive-active: var(--text-primary);
+  --interactive-muted: var(--text-faint);
+  --scrollbar-auto-track: transparent;
+  --scrollbar-auto-thumb: rgba(0, 230, 118, 0.22);
+  --scrollbar-auto-thumb-hover: rgba(0, 230, 118, 0.38);
+
+  /* ---- Depth: green-tinted top highlight + deep shadow ---------------------- */
+  --shadow-plate: 0 1px 0 rgba(0, 230, 118, 0.08) inset, 0 20px 44px rgba(0, 0, 0, 0.6);
+  --shadow-plate-phone: 0 1px 0 rgba(0, 230, 118, 0.08) inset, 0 16px 36px rgba(0, 0, 0, 0.6);
+  --shadow-well: 0 1px 2px rgba(0, 0, 0, 0.7) inset;
+  --shadow-raised: 0 1px 0 rgba(0, 230, 118, 0.09) inset;
+  --shadow-lifted: 0 1px 0 rgba(0, 230, 118, 0.09) inset, 0 6px 16px rgba(0, 0, 0, 0.45);
+  --shadow-composer: 0 1px 0 rgba(0, 230, 118, 0.11) inset, 0 8px 20px rgba(0, 0, 0, 0.45);
+  --shadow-chip: 0 1px 0 rgba(0, 230, 118, 0.07) inset;
+  --shadow-tile: 0 1px 0 rgba(0, 230, 118, 0.06) inset;
+  --shadow-floating: var(--shadow-plate);
+
+  /* ---- Light effects: presence recipes unchanged ---------------------------- */
+  --glow-window-white: 0 0 6px rgba(243, 234, 216, 0.55);
+  --glow-window-amber: 0 0 6px rgba(240, 185, 103, 0.5);
+  --glow-window-amber-breathe: 0 0 9px rgba(240, 185, 103, 0.63);
+  --glow-window-white-lg: 0 0 8px rgba(243, 234, 216, 0.55);
+  --glow-window-amber-lg: 0 0 8px rgba(240, 185, 103, 0.5);
+  --glow-live-dot: 0 0 6px rgba(0, 230, 118, 0.9);
+  --glow-light-fill: 0 0 16px rgba(0, 230, 118, 0.28);
+  --glow-control-on: 0 0 18px rgba(0, 230, 118, 0.38);
+  --voice-level: 0;
+  --light-ring-rgb: 243, 234, 216;
+  --ring-edge: 1.5px;
+  --ring-glow-lit: 12px;
+  --ring-glow-speaking: 18px;
+  --ring-a-lit-edge: 0.55;
+  --ring-a-lit-glow: 0.22;
+  --ring-a-speaking-edge: 0.7;
+  --ring-a-speaking-glow: 0.25;
+  --ring-a-peak-edge: 0.8;
+  --ring-lit: 0 0 0 var(--ring-edge) rgba(var(--light-ring-rgb), var(--ring-a-lit-edge)),
+    0 0 var(--ring-glow-lit) rgba(var(--light-ring-rgb), var(--ring-a-lit-glow));
+  --ring-speaking: 0 0 0 var(--ring-edge) rgba(var(--light-ring-rgb), var(--ring-a-speaking-edge)),
+    0 0 var(--ring-glow-speaking) rgba(var(--light-ring-rgb), var(--ring-a-speaking-glow));
+  --ring-speaking-peak: 0 0 0 var(--ring-edge) rgba(var(--light-ring-rgb), var(--ring-a-peak-edge)),
+    0 0 var(--ring-glow-speaking) rgba(var(--light-ring-rgb), var(--ring-a-speaking-glow));
+  --ring-lit-plate: 0 0 0 1px rgba(0, 230, 118, 0.22), 0 0 34px rgba(0, 230, 118, 0.12);
+  --lamp-radial: radial-gradient(closest-side, rgba(0, 230, 118, 0.14), rgba(0, 230, 118, 0));
+  --thumb-frame-lit: oklch(16.5% 0.03 155);
+  --thumb-glow: radial-gradient(70% 120% at 20% 0%, rgba(0, 230, 118, 0.14), rgba(0, 230, 118, 0));
+  --dim-filter: saturate(0.35) brightness(0.72);
+  --tag-fill: oklch(10% 0.02 155 / 0.82);
+
+  /* ---- Identity as INK: same fills as Night (identity never moves) ---------- */
+  --identity-ink-1: var(--color-avatar-1);
+  --identity-ink-2: var(--color-avatar-2);
+  --identity-ink-3: var(--color-avatar-3);
+  --identity-ink-4: var(--color-avatar-4);
+  --identity-ink-5: var(--color-avatar-5);
+  --identity-ink-6: var(--color-avatar-6);
+  --identity-ink-7: var(--color-avatar-7);
+  --identity-ink-8: var(--color-avatar-8);
+
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300e676' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  --focus-ring-color: var(--accent-primary);
+  --focus-ring: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--focus-ring-color);
+  --focus-ring-input: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--focus-ring-color);
+
+  --density-scale: 1;
+  --density-space-1: 0.25rem;
+  --density-space-2: 0.5rem;
+  --density-space-3: 0.75rem;
+  --density-space-4: 1rem;
+  --density-space-5: 1.25rem;
+
+  --w-context-panel: clamp(14rem, 24vw, 20rem);
+  --sidebar-width: 72px;
+  --sidebar-item-size: 52px;
+  --sidebar-icon-size: 26px;
+  --sidebar-bg: var(--bg-base);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-active-indicator: var(--accent-primary);
+  --h-mobile-nav: 0px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tag-fill: oklch(10% 0.02 155 / 0.82);
+}
 
 /* =============================================================================
    Re-substitute the Tailwind colour namespace on any themed subtree.

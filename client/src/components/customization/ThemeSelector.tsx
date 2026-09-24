@@ -19,12 +19,13 @@ interface ThemeOption {
 }
 
 /**
- * The four themes (docs/lantern-stage-spec.md §1.7). Each is a ground plus an
+ * The five themes (docs/lantern-stage-spec.md §1.7). Each is a ground plus an
  * ink: the accent and the base colour below are still the person's own.
  * `lib/themes.ts` is the list of ids; this is what they are called.
  */
 const THEME_OPTIONS: ThemeOption[] = [
-  { id: 'dark', label: 'Night', hint: 'The default — lit windows after dark', icon: <Moon size={16} /> },
+  { id: 'mercury', label: 'Mercury', hint: 'The default — black with a neon accent', icon: <Moon size={16} /> },
+  { id: 'dark', label: 'Night', hint: 'Lit windows after dark', icon: <Moon size={16} /> },
   { id: 'light', label: 'Daylight', hint: 'Warm paper; lit channels read as ink', icon: <Sun size={16} /> },
   { id: 'amoled', label: 'AMOLED', hint: 'A true-black street for OLED panels', icon: <Monitor size={16} /> },
   { id: 'high-contrast', label: 'High contrast', hint: 'Thicker rims, two text steps', icon: <Eye size={16} /> },

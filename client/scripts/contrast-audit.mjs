@@ -242,11 +242,13 @@ const rootBase = extractBlocks(':root');
 const daylight = extractBlocks("[data-theme='light']");
 const themeBlocks = {
   night: {},
+  mercury: extractBlocks("[data-theme='mercury']"),
   daylight,
   amoled: extractBlocks("[data-theme='amoled']"),
   'high-contrast': extractBlocks("[data-theme='high-contrast']"),
   // The looks (§1.8). Dusk sky and Voices stand on Night's set, Paper & ink on
   // Daylight's — the same inheritance the selectors in tokens.css give them.
+  // Mercury stands alone: a complete flat block, no inheritance.
   'dusk sky': extractBlocks("[data-theme='dusk']"),
   voices: extractBlocks("[data-theme='voices']"),
   'paper & ink': { ...daylight, ...extractBlocks("[data-theme='paper']") },

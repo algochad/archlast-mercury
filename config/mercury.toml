@@ -9,13 +9,16 @@ permission_cache_max_entries = 10000
 # public_url = "https://your-domain-or-ip:8443"
 
 [database]
-engine = "sqlite"
-url = "sqlite://./data/mercury.db?mode=rwc"
+# PostgreSQL is the primary database. SQLite fallback:
+# engine = "sqlite"
+# url = "sqlite://./data/mercury.db?mode=rwc"
+engine = "postgres"
+url = "postgresql://mercury:changeme@postgres:5432/mercury"
 # Connection pool size. Every in-flight handler holds one connection for as long
 # as it is querying, so this is also the cap on concurrent database work: set it
 # too low and a handful of slow requests starve everything else. Waiting for a
 # free slot is bounded (5s) rather than queued indefinitely.
-max_connections = 20
+max_connections = 50
 # Optional PostgreSQL per-connection tuning (0 keeps server defaults).
 work_mem_mb = 0
 maintenance_work_mem_mb = 0

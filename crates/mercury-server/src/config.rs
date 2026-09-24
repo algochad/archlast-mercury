@@ -151,7 +151,7 @@ impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
             engine: default_database_engine(),
-            url: "sqlite://./data/mercury.db?mode=rwc".into(),
+            url: "postgresql://mercury:changeme@postgres:5432/mercury".into(),
             max_connections: default_max_connections(),
             statement_timeout_secs: 0,
             idle_in_transaction_timeout_secs: 0,
@@ -616,10 +616,10 @@ fn default_server_name() -> String {
     "localhost".into()
 }
 fn default_database_engine() -> DatabaseEngine {
-    DatabaseEngine::Sqlite
+    DatabaseEngine::Postgres
 }
 fn default_max_connections() -> u32 {
-    20
+    50
 }
 fn default_permission_cache_max_entries() -> u64 {
     10_000
@@ -1759,9 +1759,9 @@ mod tests {
     }
 
     #[test]
-    fn database_defaults_to_sqlite_engine() {
+    fn database_defaults_to_postgres_engine() {
         let db = DatabaseConfig::default();
-        assert_eq!(db.engine, DatabaseEngine::Sqlite);
+        assert_eq!(db.engine, DatabaseEngine::Postgres);
     }
 
     #[test]
