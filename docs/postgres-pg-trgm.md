@@ -31,6 +31,7 @@ been explicitly granted `CREATE`). If the role that runs the migrations lacks
 that privilege, this migration fails with a permission error and startup /
 migration aborts.
 
+> The compose `postgres` service in `docker-compose.yml` runs as a superuser (`POSTGRES_USER: paracord` owns the `paracord` database), so `pg_trgm` creation needs no extra step with `--profile postgres`. External or managed PostgreSQL still needs the workaround below.
 ## Managed / locked-down PostgreSQL
 
 Many managed PostgreSQL providers (RDS, Cloud SQL, Azure Database, Supabase,

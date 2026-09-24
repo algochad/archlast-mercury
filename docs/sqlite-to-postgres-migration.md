@@ -13,6 +13,8 @@ paracord-server migrate-to-postgres \
     --target postgres://user:pass@db-host:5432/paracord
 ```
 
+> The migration target may be the compose `postgres` service: start it with `docker compose --profile postgres up -d postgres`, then reach it from the host via `docker compose --profile postgres exec postgres psql -U paracord -d paracord` checks or a temporary `ports: ["127.0.0.1:5432:5432"]` mapping for the `--target postgresql://…@127.0.0.1:5432/paracord` URL (remove the mapping afterwards).
+
 The command does **not** start the chat server; it runs the migration and
 exits, printing a per-table report of the rows it copied.
 

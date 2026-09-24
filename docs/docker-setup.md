@@ -21,6 +21,19 @@ default media path and needs no extra services. LiveKit is an opt-in fallback
 
 > `.env` is entirely optional and only holds overrides (see `.env.example`). It
 > is git-ignored; only `.env.example` is tracked. Do not commit secrets.
+## PostgreSQL
+
+`docker compose up -d` runs SQLite by default (zero `.env`). For PostgreSQL via the shipped single compose file:
+
+```bash
+cp .env.example .env
+# set POSTGRES_PASSWORD (generate: openssl rand -hex 32), then uncomment the
+# PARACORD_DATABASE_ENGINE / PARACORD_DATABASE_URL / PARACORD_DATABASE_MAX_CONNECTIONS lines
+docker compose --profile postgres up -d
+```
+
+The `postgres` service (`postgres:16-alpine`, `profiles: ["postgres"]`) stores data on the `pgdata` volume (`pgdata:/var/lib/postgresql/data`); `paracord-data` still holds config/uploads/media/backups. Access the database from the host with `docker compose --profile postgres exec postgres psql -U paracord -d paracord` (no host `5432` port is mapped by default). `docker compose down` keeps `pgdata`; `docker compose down -v` wipes it. The profile also composes with LiveKit: `docker compose --profile postgres --profile livekit up -d`. For production behind a reverse proxy or on Coolify, see [Deploying on Coolify](coolify.md).
+
 
 ## No-clone quick start
 
@@ -76,8 +89,14 @@ All configuration can be overridden via environment variables in `docker-compose
 | `PARACORD_SERVER_NAME` | `localhost` | Server hostname |
 | `PARACORD_PUBLIC_URL` | (auto-detected) | Public URL for CORS and invite links |
 | `PARACORD_CORS_ALLOWED_ORIGINS` | (empty) | Extra browser origins allowed to make credentialed cross-origin calls — needed only so users of *another* browser-served Paracord can add this server (see [known limitations](known-limitations.md#multi-server-from-a-browser)) |
-| `PARACORD_DATABASE_URL` | `sqlite:///data/paracord.db?mode=rwc` | SQLite database path |
-| `PARACORD_DATABASE_MAX_CONNECTIONS` | `20` | Max database connections |
+| `PARACORD_DATABASE_ENGINE` | `sqlite` | Database engine (`sqlite` or `postgres`); set `postgres` with `--profile postgres` or a managed PG |
+| `PARACORD_DATABASE_MAX_CONNECTIONS` | `20` | Max database connections (recommend `50` on PostgreSQL) |
+| `POSTGRES_PASSWORD` | (unset, required with `--profile postgres`) | Password for the compose `postgres` service; the `postgres` container refuses to start when empty (no `:?` guard is used because Compose interpolates inactive-profile services too) |
+| `PARACORD_TRUST_PROXY` | `false` | Honor `X-Forwarded-For` from a reverse proxy (set `true` behind Traefik/nginx) |
+| `PARACORD_TRUSTED_PROXY_IPS` | (empty) | Proxy CIDRs trusted for `X-Forwarded-For` — never `*` |
+| `PARACORD_COOKIE_SECURE` | `false` | Secure cookies (set `true` behind HTTPS) |
+| `PARACORD_AUTO_PORT_FORWARD` | `true` | UPnP/NAT-PMP router mapping (set `false` behind a proxy / on a VPS) |
+| `PARACORD_HOST_BIND` | `127.0.0.1` | Host bind for the published `8090` port (set `0.0.0.0` for a Compose resource on Coolify) |
 | `PARACORD_JWT_SECRET` | auto-generated | Not set in Docker. The server generates and persists a random secret to `/data/paracord.toml` on first run and reuses it thereafter |
 | `PARACORD_VOICE_NATIVE_MEDIA` | `true` | Native QUIC/WebTransport voice (the default media path); no LiveKit required |
 | `PARACORD_REGISTRATION_ENABLED` | `true` | Allow new user registrations |
@@ -96,6 +115,7 @@ All configuration can be overridden via environment variables in `docker-compose
 | Volume | Container Path | Description |
 |---|---|---|
 | `paracord-data` | `/data` | Config file, database, uploads, media, backups |
+| `pgdata` | `/var/lib/postgresql/data` | PostgreSQL data (only with `--profile postgres`) |
 
 ## Ports
 

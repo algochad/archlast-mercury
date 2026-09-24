@@ -16,26 +16,38 @@ services:
     build: ${PARACORD_BUILD_CONTEXT:-.}
     container_name: paracord
     ports:
-      # HTTP API + WebSocket gateway. Published to the HOST LOOPBACK ONLY
-      # (127.0.0.1) so cleartext auth tokens/cookies are never exposed to the
-      # LAN/WAN by default. Put a TLS-terminating reverse proxy (Caddy/nginx) in
-      # front and let it connect to 127.0.0.1:8090, or set
-      # PARACORD_TLS_ENABLED=true below. Only change this to "8090:8090" if you
-      # have accepted the risk of serving plaintext HTTP to the network.
-      - "127.0.0.1:8090:8090"
+      # HTTP API + WebSocket gateway. Default is loopback-only for bare-metal safety.
+      # For Coolify (Traefik routes to the container), either:
+      #   - Use the Dockerfile resource (ports ignored, Traefik uses EXPOSE 8090), or
+      #   - Set PARACORD_HOST_BIND=0.0.0.0 in .env when using the Compose resource.
+      - "${PARACORD_HOST_BIND:-127.0.0.1}:8090:8090"
       # Native QUIC / WebTransport media (raw QUIC desktop + browser WebTransport).
+      # Coolify/Traefik cannot proxy UDP — this must be published on the host
+      # and opened on the VPS firewall separately (see docs/coolify.md).
       - "8443:8443/udp"
     volumes:
       - paracord-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     environment:
       # Server
       - PARACORD_BIND_ADDRESS=0.0.0.0:8090
       - PARACORD_SERVER_NAME=localhost
       # - PARACORD_PUBLIC_URL=https://chat.example.com
 
-      # Database (SQLite persisted on the paracord-data volume)
-      - PARACORD_DATABASE_URL=sqlite:///data/paracord.db?mode=rwc
-      - PARACORD_DATABASE_MAX_CONNECTIONS=20
+      # Database — SQLite by default (zero config). When running with
+      # --profile postgres, set in .env:
+      #   POSTGRES_PASSWORD=<strong random: openssl rand -hex 32>
+      #   PARACORD_DATABASE_URL=postgresql://paracord:${POSTGRES_PASSWORD}@postgres:5432/paracord
+      #   PARACORD_DATABASE_ENGINE=postgres
+      # On Coolify with a managed Postgres resource, set PARACORD_DATABASE_URL
+      # to that resource's internal URL instead (see docs/coolify.md).
+      # The defaults below keep `docker compose up -d` on SQLite.
+      - PARACORD_DATABASE_URL=${PARACORD_DATABASE_URL:-sqlite:///data/paracord.db?mode=rwc}
+      - PARACORD_DATABASE_ENGINE=${PARACORD_DATABASE_ENGINE:-sqlite}
+      - PARACORD_DATABASE_MAX_CONNECTIONS=${PARACORD_DATABASE_MAX_CONNECTIONS:-20}
 
       # Auth: no secret needed here. The server generates a strong random
       # jwt_secret on first run and persists it to /data/paracord.toml, then
@@ -119,5 +131,38 @@ services:
     command: --bind 0.0.0.0
     restart: unless-stopped
 
+  # Optional PostgreSQL — NOT started by default. Bring it up explicitly:
+  #   Local: docker compose --profile postgres up -d   (needs POSTGRES_PASSWORD in .env)
+  #   Coolify: create a managed Postgres resource instead and point
+  #            PARACORD_DATABASE_URL at it (see docs/coolify.md); this
+  #            compose service is for local dev / non-Coolify hosts.
+  postgres:
+    image: postgres:16-alpine
+    container_name: paracord-postgres
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: paracord
+      POSTGRES_USER: paracord
+      # Compose interpolates inactive-profile services too, so a `:?` guard here
+      # would break SQLite zero-config (`docker compose config` with no .env).
+      # Empty default instead: the postgres image itself refuses an empty
+      # password at startup ("superuser password is not specified") — the
+      # fail-fast. Never set a placeholder default; it would become real.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # No host port mapping by default — internal only (paracord → postgres:5432).
+    # To `psql` from the host, add temporarily:
+    #   ports: ["127.0.0.1:5432:5432"]
+    # or use: docker compose --profile postgres exec postgres psql -U paracord
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paracord -d paracord"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
 volumes:
   paracord-data:
+  pgdata:

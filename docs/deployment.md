@@ -158,14 +158,16 @@ refused this way is told which host refused them and which setting fixes it.
 
 SQLite is the zero-config default and is fine for small communities. For sustained
 multi-user production, larger message history, or external DB tooling, switch to
-PostgreSQL:
+PostgreSQL. Under Docker Compose the shipped `docker-compose.yml` already contains
+a profile-gated `postgres` service — no hand-written service needed:
 
 ```bash
-PARACORD_DATABASE_ENGINE=postgres
-PARACORD_DATABASE_URL=postgresql://paracord:PASSWORD@localhost:5432/paracord?sslmode=prefer
-PARACORD_DATABASE_MAX_CONNECTIONS=50
+cp .env.example .env   # set POSTGRES_PASSWORD, uncomment the PARACORD_DATABASE_* lines
+docker compose --profile postgres up -d
 ```
 
+On Coolify, prefer a managed PostgreSQL resource and point `PARACORD_DATABASE_URL`
+at its internal URL (see [Deploying on Coolify](coolify.md) §4). Bare-metal equivalent:
 Paracord runs its PostgreSQL migration track automatically on startup. Already
 running on SQLite? The server ships a one-shot migrator:
 

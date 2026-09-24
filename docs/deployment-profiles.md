@@ -18,6 +18,7 @@ This document captures baseline profile values for local development, single-nod
 - LiveKit reachable via public WSS endpoint
 - Persistent volumes enabled for postgres/uploads/files
 - Federation optional (enable after key provisioning)
+- PostgreSQL (optional): `PARACORD_DATABASE_ENGINE=postgres`, `PARACORD_DATABASE_URL=postgresql://paracord:<pw>@postgres:5432/paracord`, `PARACORD_DATABASE_MAX_CONNECTIONS=50`, `pgdata` persistent volume (`pgdata:/var/lib/postgresql/data`)
 
 ## Internet Testbed
 

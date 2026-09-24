@@ -23,6 +23,7 @@ It covers Docker Compose, systemd, reverse proxy/TLS, PostgreSQL, backups, monit
 
 ## 2. Docker Compose (Paracord + PostgreSQL + LiveKit)
 
+> The shipped `docker-compose.yml` already contains the PostgreSQL service below as `profiles: ["postgres"]` with interpolation defaults (`PARACORD_DATABASE_URL=${…:-sqlite…}`), so the expanded example that follows is the same topology with the profile gate removed for clarity. Prefer `docker compose --profile postgres up -d` over copying this block.
 ```yaml
 services:
   paracord:

@@ -155,6 +155,8 @@ reverse proxy to handle HTTPS. Browsers only give a page the microphone, camera 
 once it is served over HTTPS, so put the proxy in front before you send anyone the address;
 [Docker Setup](docs/docker-setup.md) has an example.
 
+PostgreSQL option: `docker compose --profile postgres up -d` (after setting `POSTGRES_PASSWORD` in `.env`). Deploying on Coolify: see [Deploying on Coolify](docs/coolify.md).
+
 For the longer walk through a first run see [Getting Started](docs/getting-started.md); for
 a domain name, PostgreSQL and backups see [Deployment](docs/deployment.md).
 
