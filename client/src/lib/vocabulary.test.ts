@@ -281,7 +281,7 @@ describe('the host you run is an instance', () => {
 
   it('claims an instance, and names the first server inside it', () => {
     const copy = copyOf('pages/InstanceSetupPage.tsx');
-    expect(copy).toContain('Set up your Paracord instance');
+    expect(copy).toContain('Set up your Archlast Mercury instance');
     expect(copy).toContain('Instance name');
     expect(copy).toContain('First server name');
     expect(copy).toContain('Claim this instance');

@@ -188,20 +188,20 @@ jobs:
         working-directory: client
         run: npm ci && npm run build
       - name: Verify Rust API schema export
-        run: cargo run --locked -p paracord-contracts --bin export-contracts -- --check contracts/api-contracts.json
+        run: cargo run --locked -p mercury-contracts --bin export-contracts -- --check contracts/api-contracts.json
       - name: Check
         run: cargo check --workspace
       - name: Test
         run: cargo test --workspace --all-targets
       - name: Build server binary
-        run: cargo build --release --bin paracord-server
+        run: cargo build --release --bin mercury-server
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
       - name: Clippy (desktop crate, all targets)
         # The desktop Tauri crate carries native-media test targets that the
         # plain `--workspace` clippy above does not lint (`--all-targets`).
         # Native deps (webkit2gtk, libvpx, ...) are installed on this runner.
-        run: cargo clippy -p paracord-desktop --all-targets -- -D warnings
+        run: cargo clippy -p mercury-desktop --all-targets -- -D warnings
       - name: Format
         run: cargo fmt --all -- --check
 
@@ -268,11 +268,11 @@ jobs:
       - name: PostgreSQL upgrade from latest release tag
         run: python3 scripts/release_postgres_upgrade_from_tag_smoke.py v0.9.0
       - name: Run PostgreSQL smoke tests (paracord-db)
-        run: cargo test -p paracord-db postgres_pool_and_migrations_smoke_when_configured -- --nocapture
+        run: cargo test -p mercury-db postgres_pool_and_migrations_smoke_when_configured -- --nocapture
       - name: Run PostgreSQL query-plan smoke (paracord-db)
-        run: cargo test -p paracord-db postgres_query_plan_smoke_when_configured -- --nocapture
+        run: cargo test -p mercury-db postgres_query_plan_smoke_when_configured -- --nocapture
       - name: Run paracord-api PostgreSQL route smoke
-        run: cargo test -p paracord-api --test postgres_route_smoke -- --nocapture
+        run: cargo test -p mercury-api --test postgres_route_smoke -- --nocapture
       - name: Run the full paracord-api integration suite on PostgreSQL
         # The suite defaults to `sqlite::memory:`, which structurally cannot
         # catch PostgreSQL-only defects — a SQLite-ism in a query, a type the
@@ -284,19 +284,19 @@ jobs:
         # With PARACORD_TEST_POSTGRES_URL set, every test provisions its own
         # database cloned from a migrated template, so isolation matches SQLite's
         # and the migration cost is paid once per test binary.
-        run: cargo test -p paracord-api --tests --no-fail-fast -- --test-threads=4
+        run: cargo test -p mercury-api --tests --no-fail-fast -- --test-threads=4
       - name: Install database recovery tools
         run: sudo apt-get update && sudo apt-get install -y sqlite3 postgresql-client-16 openssl
       - name: SQLite -> PostgreSQL migrator end-to-end
         # Seeds a freshly migrated temp SQLite database, runs
-        # `paracord-server migrate-to-postgres` against the live PG service, and
+        # `mercury-server migrate-to-postgres` against the live PG service, and
         # asserts every table's row count matches the source. Uses a dedicated
         # throwaway target database so it does not collide with the smoke data
         # loaded above.
         run: python3 scripts/ci_pg_migrator_smoke.py
       - name: Verify isolated SQLite and PostgreSQL archive recovery
         env:
-          PARACORD_RESTORE_BINARY: ${{ github.workspace }}/target/debug/paracord-server
+          PARACORD_RESTORE_BINARY: ${{ github.workspace }}/target/debug/mercury-server
         run: python3 scripts/ci_restore_smoke.py
 
   client:
@@ -446,9 +446,10 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/paracord
+          images: ghcr.io/${{ github.repository_owner }}/archlast-mercury
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=paracord,enable=true
             type=sha,format=short
       - name: Build and publish image
         uses: docker/build-push-action@v7
@@ -620,7 +621,7 @@ jobs:
         working-directory: client
         run: npm run build
       - name: Build release server binary
-        run: cargo build --release --bin paracord-server
+        run: cargo build --release --bin mercury-server
       - name: Install Playwright browser
         working-directory: client
         run: npx playwright install --with-deps chromium

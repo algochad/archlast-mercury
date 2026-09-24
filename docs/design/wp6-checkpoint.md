@@ -33,7 +33,7 @@ No endpoint was added.
 | `client/src/components/home/HomeNeedsYou.tsx` | `NeedsYouRow` (§8), the ranking (`homeAttention`), and the attention-preview machinery. |
 | `client/src/components/home/HomePickUp.tsx` | "Pick up where you left off". |
 | `client/src/components/home/HomeAddBuilding.tsx` | The add-a-server row. |
-| `client/e2e/design-review.spec.ts` | The `PARACORD_E2E_DESIGN_WP=wp6` capture path (two scenarios). |
+| `client/e2e/design-review.spec.ts` | The `MERCURY_E2E_DESIGN_WP=wp6` capture path (two scenarios). |
 
 ### Deleted, with the presentation they carried
 
@@ -170,7 +170,7 @@ The server's own event list is the full one.
   error banner. The section makes no claim of completeness, and one unreachable
   server must not blank the events of the others.
 - One action per card (§8): `I'm going` / `You're going`, `PUT`/`DELETE` on the
-  existing RSVP route, and it dispatches the `paracord:scheduled-events-changed`
+  existing RSVP route, and it dispatches the `mercury:scheduled-events-changed`
   event the server's list already listens for.
 - **With nothing scheduled the section does not render.** An empty "Coming up"
   heading over a blank space is the "No data" of section headers.
@@ -260,7 +260,7 @@ navigates to the conversation it names.
 ### Screenshots
 
 ```bash
-PARACORD_E2E_DESIGN=1 PARACORD_E2E_DESIGN_WP=wp6 npx playwright test e2e/design-review.spec.ts
+MERCURY_E2E_DESIGN=1 MERCURY_E2E_DESIGN_WP=wp6 npx playwright test e2e/design-review.spec.ts
 # → output/design-reference/wp6/ (gitignored)
 ```
 

@@ -1,0 +1,779 @@
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
+use mercury_core::AppState;
+use mercury_federation::client::FederationLeaveRequest;
+use mercury_models::permissions::Permissions;
+use serde::Deserialize;
+use serde_json::{json, Value};
+
+use crate::error::ApiError;
+use crate::middleware::AuthUser;
+use crate::routes::audit;
+use crate::routes::mod_log;
+
+/// Matches the `members.nick` column. The handler previously accepted a
+/// nickname of any length, which SQLite stored and PostgreSQL rejected with a
+/// 500.
+const MAX_NICK_LEN: usize = 32;
+
+/// Reject a role the actor is not allowed to hand out: never ADMINISTRATOR, and
+/// never a role carrying a permission bit the actor does not already hold.
+///
+/// Shared with every other surface that can cause a role to be granted (e.g.
+/// the economy level-role mapping), so a lesser-privileged moderator cannot use
+/// an indirect grant path to escalate themselves or others.
+pub(crate) fn validate_member_role_assignment(
+    guild_owner_id: i64,
+    actor_user_id: i64,
+    actor_perms: mercury_models::permissions::Permissions,
+    role: &mercury_db::roles::RoleRow,
+) -> Result<(), ApiError> {
+    if actor_user_id == guild_owner_id || actor_perms.contains(Permissions::ADMINISTRATOR) {
+        return Ok(());
+    }
+    if role.permissions & Permissions::ADMINISTRATOR.bits() != 0 {
+        return Err(ApiError::Forbidden);
+    }
+    let disallowed = role.permissions & !actor_perms.bits();
+    if disallowed != 0 {
+        return Err(ApiError::Forbidden);
+    }
+    Ok(())
+}
+
+pub async fn list_members(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    mercury_core::permissions::ensure_guild_member(&state.db, guild_id, auth.user_id).await?;
+
+    let members = mercury_db::members::get_guild_members(&state.db, guild_id, 1000, None)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let roles_by_user = mercury_db::roles::get_member_roles_for_guild(&state.db, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let mut result: Vec<Value> = Vec::with_capacity(members.len());
+    for m in members {
+        let role_ids: Vec<String> = roles_by_user
+            .get(&m.user_id)
+            .map(|roles| roles.iter().map(|r| r.id.to_string()).collect())
+            .unwrap_or_default();
+        result.push(json!({
+            "user_id": m.user_id.to_string(),
+            "guild_id": guild_id.to_string(),
+            "nick": m.nick,
+            "joined_at": m.joined_at.to_rfc3339(),
+            "deaf": m.deaf,
+            "mute": m.mute,
+            "communication_disabled_until": m.communication_disabled_until.map(|v| v.to_rfc3339()),
+            "roles": role_ids,
+            "user": {
+                "id": m.user_id.to_string(),
+                "username": m.username,
+                "display_name": m.user_display_name,
+                "discriminator": m.discriminator,
+                "avatar_hash": m.user_avatar_hash,
+                "flags": m.user_flags,
+                "bot": mercury_core::is_bot(m.user_flags),
+                "system": false,
+            }
+        }));
+    }
+
+    Ok(Json(json!(result)))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateMemberRequest {
+    pub nick: Option<String>,
+    pub roles: Option<Vec<String>>,
+    pub communication_disabled_until: Option<String>,
+}
+
+pub async fn update_member(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((guild_id, user_id)): Path<(i64, i64)>,
+    Json(body): Json<UpdateMemberRequest>,
+) -> Result<Json<Value>, ApiError> {
+    if let Some(nick) = body.nick.as_deref() {
+        if nick.chars().count() > MAX_NICK_LEN {
+            return Err(ApiError::BadRequest("nick is too long".into()));
+        }
+        // A nickname is the guild-scoped twin of `display_name`, which
+        // `PATCH /users/@me` has always run through this validator. It is the
+        // label every message, member list and audit-log change payload in the
+        // space carries, so it gets the same contract.
+        if mercury_util::validation::contains_dangerous_markup(nick) {
+            return Err(ApiError::BadRequest("nick contains unsafe markup".into()));
+        }
+        // A nickname replaces the member's name everywhere in the space. A
+        // blank one leaves an unnamed author on every message they send, and a
+        // bidi override rewrites the name the reader sees.
+        mercury_util::validation::validate_visible_label(nick)
+            .map_err(|_| ApiError::BadRequest("nick must be readable text".into()))?;
+    }
+    let guild = mercury_db::guilds::get_guild(&state.db, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+    let actor_roles = mercury_db::roles::get_member_roles(&state.db, auth.user_id, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+    // Guild-scoped gate: `compute_guild_permissions` also applies the bot
+    // install-permission cap, which the raw fold over `actor_roles` cannot.
+    // `actor_roles` is still needed below for the role-hierarchy comparison.
+    let actor_perms = mercury_core::permissions::compute_guild_permissions(
+        &state.db,
+        guild_id,
+        guild.owner_id,
+        auth.user_id,
+    )
+    .await?;
+
+    // The actor must be a member of the guild, and the target must exist as a
+    // member (404 otherwise) — mutating a non-member would silently insert a
+    // row for a user who never joined.
+    mercury_core::permissions::ensure_guild_member(&state.db, guild_id, auth.user_id).await?;
+    let target_member = mercury_db::members::get_member(&state.db, user_id, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+
+    if body.nick.is_some() {
+        if auth.user_id != user_id {
+            mercury_core::permissions::require_permission(
+                actor_perms,
+                mercury_models::permissions::Permissions::MANAGE_NICKNAMES,
+            )?;
+            // Renaming another member is a moderation action and must obey the same
+            // owner immunity and role hierarchy as kick/ban/timeout. The bare
+            // MANAGE_NICKNAMES check let a junior moderator rename the guild owner
+            // or anyone ranked above them.
+            mercury_core::admin::ensure_actor_can_moderate_target(
+                &state.db,
+                guild_id,
+                auth.user_id,
+                user_id,
+            )
+            .await?;
+        } else {
+            // Renaming *yourself* is what CHANGE_NICKNAME governs. The branch
+            // used to check nothing at all, so revoking the bit from @everyone
+            // had no effect anywhere on the instance. A nickname is a
+            // guild-visible label, so a timed-out member must not be able to
+            // rewrite it either — the same reasoning that puts thread creation
+            // and renaming behind `ensure_not_timed_out`.
+            mercury_core::permissions::require_permission(
+                actor_perms,
+                mercury_models::permissions::Permissions::CHANGE_NICKNAME,
+            )?;
+            mercury_core::permissions::ensure_not_timed_out(&state.db, guild_id, auth.user_id)
+                .await?;
+        }
+    }
+
+    let mut role_ids: Vec<String> =
+        mercury_db::roles::get_member_roles(&state.db, user_id, guild_id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+            .iter()
+            .map(|role| role.id.to_string())
+            .collect();
+
+    if let Some(raw_roles) = body.roles {
+        mercury_core::permissions::require_permission(actor_perms, Permissions::MANAGE_ROLES)?;
+
+        let guild_roles = mercury_db::roles::get_guild_roles(&state.db, guild_id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+        let role_by_id: std::collections::HashMap<i64, mercury_db::roles::RoleRow> = guild_roles
+            .iter()
+            .cloned()
+            .map(|role| (role.id, role))
+            .collect();
+        let requested_role_ids: Vec<i64> = raw_roles
+            .iter()
+            .map(|r| {
+                r.parse::<i64>()
+                    .map_err(|_| ApiError::BadRequest("Invalid role id".into()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if requested_role_ids
+            .iter()
+            .any(|role_id| !role_by_id.contains_key(role_id))
+        {
+            return Err(ApiError::BadRequest(
+                "One or more roles do not belong to this guild".into(),
+            ));
+        }
+
+        let existing_roles = mercury_db::roles::get_member_roles(&state.db, user_id, guild_id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+        let mut requested_ids: std::collections::HashSet<i64> =
+            requested_role_ids.iter().copied().collect();
+        requested_ids.insert(guild_id); // Member role is always required
+        let existing_ids: std::collections::HashSet<i64> =
+            existing_roles.iter().map(|r| r.id).collect();
+
+        if auth.user_id != guild.owner_id {
+            let actor_top_role_pos = actor_roles.iter().map(|r| r.position).max().unwrap_or(0);
+            // Hierarchy is enforced on both the roles being added/kept AND the
+            // roles being removed: a non-owner may not manage (assign or strip)
+            // a role at or above their own top position. Checking only the
+            // add/keep set would let a lower-ranked MANAGE_ROLES actor demote a
+            // higher-ranked member by omitting their superior role.
+            for role_id in requested_ids
+                .iter()
+                .chain(existing_ids.difference(&requested_ids))
+            {
+                if *role_id == guild_id {
+                    continue;
+                }
+                let Some(role) = role_by_id.get(role_id) else {
+                    continue;
+                };
+                if role.position >= actor_top_role_pos {
+                    return Err(ApiError::Forbidden);
+                }
+                validate_member_role_assignment(guild.owner_id, auth.user_id, actor_perms, role)?;
+            }
+        }
+
+        for role_id in requested_ids.difference(&existing_ids) {
+            mercury_db::roles::add_member_role(&state.db, user_id, guild_id, *role_id)
+                .await
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+        }
+        for role_id in existing_ids.difference(&requested_ids) {
+            if *role_id != guild_id {
+                mercury_db::roles::remove_member_role(&state.db, user_id, guild_id, *role_id)
+                    .await
+                    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+            }
+        }
+
+        // Invalidate permission cache when a user's roles change
+        mercury_core::permissions::invalidate_user(&state.permission_cache, user_id).await;
+
+        role_ids = mercury_db::roles::get_member_roles(&state.db, user_id, guild_id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+            .iter()
+            .map(|role| role.id.to_string())
+            .collect();
+    }
+
+    let mut timed_out_until = target_member.communication_disabled_until;
+    let touched_timeout = body.communication_disabled_until.is_some();
+    if let Some(raw_until) = body.communication_disabled_until {
+        let parsed = if raw_until.trim().is_empty() {
+            None
+        } else {
+            Some(
+                chrono::DateTime::parse_from_rfc3339(&raw_until)
+                    .map_err(|_| {
+                        ApiError::BadRequest("Invalid communication_disabled_until".into())
+                    })?
+                    .with_timezone(&chrono::Utc),
+            )
+        };
+        let member = mercury_core::admin::timeout_member(
+            &state.db,
+            guild_id,
+            auth.user_id,
+            user_id,
+            parsed,
+        )
+        .await?;
+        timed_out_until = member.communication_disabled_until;
+    }
+
+    // Apply the nickname change only after every authorization branch above has
+    // passed, so a rejected role/timeout/nickname request never leaves a
+    // partially-applied nick mutation behind.
+    let updated = mercury_db::members::update_member(
+        &state.db,
+        user_id,
+        guild_id,
+        body.nick.as_deref(),
+        None,
+        None,
+    )
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let member_json = json!({
+        "guild_id": guild_id.to_string(),
+        "user_id": updated.user_id.to_string(),
+        "nick": updated.nick,
+        "deaf": updated.deaf,
+        "mute": updated.mute,
+        "communication_disabled_until": timed_out_until.map(|v| v.to_rfc3339()),
+        "joined_at": updated.joined_at.to_rfc3339(),
+        "roles": role_ids.clone(),
+    });
+
+    state.event_bus.dispatch(
+        "GUILD_MEMBER_UPDATE",
+        json!({
+            "guild_id": guild_id.to_string(),
+            "user_id": user_id.to_string(),
+            "nick": updated.nick,
+            "communication_disabled_until": timed_out_until.map(|v| v.to_rfc3339()),
+            "roles": role_ids.clone(),
+        }),
+        Some(guild_id),
+    );
+    audit::log_action(
+        &state,
+        guild_id,
+        auth.user_id,
+        audit::ACTION_MEMBER_UPDATE,
+        Some(user_id),
+        None,
+        Some(json!({
+            "nick": updated.nick,
+            "communication_disabled_until": timed_out_until.map(|v| v.to_rfc3339()),
+            "roles": role_ids,
+        })),
+    )
+    .await;
+
+    if touched_timeout {
+        mod_log::emit_mod_log(
+            &state,
+            guild_id,
+            "Member Timeout Updated",
+            "A member timeout/mute state was changed.",
+            &[
+                ("Actor", auth.user_id.to_string()),
+                ("Target", user_id.to_string()),
+                (
+                    "Timeout Until",
+                    timed_out_until
+                        .map(|v| v.to_rfc3339())
+                        .unwrap_or_else(|| "cleared".to_string()),
+                ),
+            ],
+        )
+        .await;
+    }
+
+    Ok(Json(member_json))
+}
+
+pub async fn kick_member(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((guild_id, user_id)): Path<(i64, i64)>,
+) -> Result<StatusCode, ApiError> {
+    mercury_core::admin::kick_member(&state.db, guild_id, auth.user_id, user_id).await?;
+
+    // Terminate any in-progress voice/video call the kicked member is part of so
+    // they stop eavesdropping on and injecting into the call.
+    crate::routes::voice::evict_user_from_guild_media(&state, guild_id, user_id).await;
+
+    // Evict the removed member's cached channel permissions so a stale cache hit
+    // cannot keep granting access for the remainder of the cache TTL.
+    mercury_core::permissions::invalidate_user(&state.permission_cache, user_id).await;
+
+    state.member_index.remove_member(guild_id, user_id);
+    state.event_bus.dispatch(
+        "GUILD_MEMBER_REMOVE",
+        json!({
+            "guild_id": guild_id.to_string(),
+            "user_id": user_id.to_string(),
+        }),
+        Some(guild_id),
+    );
+    audit::log_action(
+        &state,
+        guild_id,
+        auth.user_id,
+        audit::ACTION_MEMBER_KICK,
+        Some(user_id),
+        None,
+        None,
+    )
+    .await;
+
+    mod_log::emit_mod_log(
+        &state,
+        guild_id,
+        "Member Kicked",
+        "A member was removed from the server.",
+        &[
+            ("Actor", auth.user_id.to_string()),
+            ("Target", user_id.to_string()),
+        ],
+    )
+    .await;
+
+    if mercury_federation::is_enabled() {
+        let fed_state = state.clone();
+        tokio::spawn(async move {
+            federation_send_leave_rpc_for_mirrored_guild(&fed_state, guild_id, user_id).await;
+            federation_forward_member_event(&fed_state, "m.member.leave", guild_id, user_id).await;
+        });
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn leave_guild(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<i64>,
+) -> Result<StatusCode, ApiError> {
+    // Check that user is not the owner
+    let guild = mercury_db::guilds::get_guild(&state.db, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+
+    if guild.owner_id == auth.user_id {
+        return Err(ApiError::BadRequest(
+            "Cannot leave a guild you own. Transfer ownership or delete the guild.".into(),
+        ));
+    }
+
+    mercury_db::members::remove_member(&state.db, auth.user_id, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    // Terminate any in-progress voice/video call the leaving member is part of.
+    crate::routes::voice::evict_user_from_guild_media(&state, guild_id, auth.user_id).await;
+
+    // Evict the leaving member's cached channel permissions so a stale cache hit
+    // cannot keep granting access for the remainder of the cache TTL.
+    mercury_core::permissions::invalidate_user(&state.permission_cache, auth.user_id).await;
+
+    state.member_index.remove_member(guild_id, auth.user_id);
+    state.event_bus.dispatch(
+        "GUILD_MEMBER_REMOVE",
+        json!({
+            "guild_id": guild_id.to_string(),
+            "user_id": auth.user_id.to_string(),
+        }),
+        Some(guild_id),
+    );
+
+    if mercury_federation::is_enabled() {
+        let fed_state = state.clone();
+        let leaving_user_id = auth.user_id;
+        tokio::spawn(async move {
+            federation_send_leave_rpc_for_mirrored_guild(&fed_state, guild_id, leaving_user_id)
+                .await;
+            federation_forward_member_event(
+                &fed_state,
+                "m.member.leave",
+                guild_id,
+                leaving_user_id,
+            )
+            .await;
+        });
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// PUT /guilds/{guild_id}/members/@me — invite-less join for public discoverable guilds.
+pub async fn join_public_guild(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<i64>,
+) -> Result<Json<mercury_contracts::guild::GuildDetail>, ApiError> {
+    let guild = mercury_db::guilds::get_guild(&state.db, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+
+    if !guild.visibility.eq_ignore_ascii_case("public") {
+        return Err(ApiError::Forbidden);
+    }
+    if !mercury_db::guilds::parse_allowed_role_ids(&guild.allowed_roles).is_empty() {
+        return Err(ApiError::Forbidden);
+    }
+
+    if mercury_db::members::get_member(&state.db, auth.user_id, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .is_some()
+    {
+        let member_count = mercury_db::members::get_member_count(&state.db, guild_id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+        return Ok(Json(crate::routes::guilds::guild_detail(
+            &guild,
+            member_count,
+        )?));
+    }
+
+    // Block users currently banned from this guild from silently rejoining. A
+    // ban removes the member row, so a banned user reaches this non-member path;
+    // without this check they could evade the ban by self-joining the public
+    // guild. Mirrors the invite-accept path (invites.rs::accept_invite).
+    let banned = mercury_db::bans::get_ban(&state.db, auth.user_id, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .is_some();
+    if banned {
+        return Err(ApiError::Forbidden);
+    }
+
+    // Honor an active anti-raid lockdown, matching accept_invite parity so the
+    // invite-less join path can't be used to slip past a lockdown.
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let bot_settings_json: Value = guild
+        .bot_settings
+        .as_deref()
+        .and_then(|raw| serde_json::from_str(raw).ok())
+        .unwrap_or_else(|| json!({}));
+    let anti_raid_config = bot_settings_json
+        .get("auto_mod")
+        .and_then(|value| value.get("anti_raid"))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let anti_raid_enabled = anti_raid_config
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if anti_raid_enabled {
+        let locked_until_ms = match anti_raid_config.get("lockdown_until_ms") {
+            Some(Value::Number(raw)) => raw.as_i64().unwrap_or(0),
+            Some(Value::String(raw)) => raw.parse::<i64>().unwrap_or(0),
+            _ => 0,
+        };
+        if locked_until_ms > now_ms {
+            return Err(ApiError::BadRequest(
+                "Server is temporarily in raid lockdown".into(),
+            ));
+        }
+    }
+
+    // Insert and count in one transaction: a concurrent join can pass the
+    // membership check above and insert first, so the post-join count is read
+    // from the database, never inferred. A count failure rolls the membership
+    // insert back rather than reporting success it cannot describe.
+    let joined = mercury_db::members::add_member_and_count(&state.db, auth.user_id, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    // `inserted` is false only when a racing join already wrote the row —
+    // the member exists either way, but role-grant/index/event side effects
+    // must not replay for a membership this request did not create.
+    if joined.inserted {
+        let _ =
+            mercury_db::roles::add_member_role(&state.db, auth.user_id, guild_id, guild_id).await;
+
+        state.member_index.add_member(guild_id, auth.user_id);
+
+        let user = mercury_db::users::get_user_by_id(&state.db, auth.user_id)
+            .await
+            .ok()
+            .flatten();
+        if let Some(user) = user {
+            state.event_bus.dispatch(
+                "GUILD_MEMBER_ADD",
+                json!({
+                    "guild_id": guild_id.to_string(),
+                    "user": {
+                        "id": user.id.to_string(),
+                        "username": user.username,
+                        "display_name": user.display_name,
+                        "discriminator": user.discriminator,
+                        "avatar_hash": user.avatar_hash,
+                    }
+                }),
+                Some(guild_id),
+            );
+        }
+
+        // Same as the invite path: the joiner's other sessions learn the
+        // server from an event or not at all, and GUILD_MEMBER_ADD carries no
+        // guild to put in the sidebar.
+        match crate::routes::guilds::guild_detail(&guild, joined.member_count).and_then(|detail| {
+            serde_json::to_value(&detail).map_err(|e| ApiError::Internal(e.into()))
+        }) {
+            Ok(detail) => {
+                state
+                    .event_bus
+                    .dispatch_to_users("GUILD_CREATE", detail, vec![auth.user_id])
+            }
+            Err(error) => {
+                tracing::warn!(%error, "failed to announce the joined space to its new member")
+            }
+        }
+
+        // Same as the invite path: the join is what lets the joiner and the
+        // people already inside see each other's light.
+        crate::routes::realtime::announce_guild_join(&state, guild_id, auth.user_id).await;
+
+        federation_announce_local_join(&state, guild_id, auth.user_id);
+    }
+
+    Ok(Json(crate::routes::guilds::guild_detail(
+        &guild,
+        joined.member_count,
+    )?))
+}
+
+/// Registration auto-admission, public joins, and invites must establish the
+/// same origin membership before forwarding the local user's announcement.
+pub(crate) fn federation_announce_local_join(state: &AppState, guild_id: i64, user_id: i64) {
+    if !mercury_federation::is_enabled() {
+        return;
+    }
+    let state = state.clone();
+    tokio::spawn(async move {
+        if let Ok(channels) = mercury_db::channels::get_guild_channels(&state.db, guild_id).await {
+            if let Some(channel) = channels
+                .iter()
+                .find(|channel| channel.channel_type == 0)
+                .or_else(|| channels.first())
+            {
+                crate::routes::invites::federation_send_join_rpc_for_mirrored_guild(
+                    &state, guild_id, channel.id, user_id, None,
+                )
+                .await;
+            }
+        }
+        federation_forward_member_event(&state, "m.member.join", guild_id, user_id).await;
+    });
+}
+
+pub(crate) async fn federation_forward_member_event(
+    state: &AppState,
+    event_type: &str,
+    guild_id: i64,
+    user_id: i64,
+) {
+    let user = match mercury_db::users::get_user_by_id(&state.db, user_id).await {
+        Ok(Some(user)) => user,
+        _ => return,
+    };
+
+    let service = crate::routes::federation::build_federation_service();
+    if !service.is_enabled() {
+        return;
+    }
+
+    let outbound =
+        crate::routes::federation::resolve_outbound_context(state, &service, guild_id, None).await;
+    if let Ok(Some(mapping)) =
+        mercury_db::federation::get_remote_user_mapping_by_local(&state.db, user_id).await
+    {
+        // A kick/ban of a remote pseudo-user is the room authority's decision,
+        // not an event authored under that pseudo-user's local placeholder.
+        if !outbound.uses_remote_mapping {
+            if let Some(identity) =
+                mercury_federation::protocol::FederatedIdentity::parse(&mapping.remote_user_id)
+            {
+                if event_type == "m.member.leave" {
+                    let _ = mercury_db::federation::delete_room_membership(
+                        &state.db,
+                        &outbound.room_id,
+                        &mapping.remote_user_id,
+                    )
+                    .await;
+                }
+                crate::routes::federation::publish_membership_endorsement(
+                    state, &service, guild_id, &identity, event_type,
+                )
+                .await;
+            }
+        }
+        return;
+    }
+    let content = json!({
+        "guild_id": outbound.payload_guild_id.clone(),
+        "user_id": user_id.to_string(),
+    });
+    let envelope = match service.build_custom_envelope(
+        event_type,
+        outbound.room_id.clone(),
+        &user.username,
+        &content,
+        chrono::Utc::now().timestamp_millis(),
+        None,
+        Some(&format!("{}:{}", outbound.payload_guild_id, user_id)),
+    ) {
+        Ok(env) => env,
+        Err(_) => return,
+    };
+
+    let _ = service.persist_event(&state.db, &envelope).await;
+    service
+        .forward_envelope_to_peers(&state.db, &envelope)
+        .await;
+}
+
+pub(crate) async fn federation_send_leave_rpc_for_mirrored_guild(
+    state: &AppState,
+    guild_id: i64,
+    user_id: i64,
+) {
+    let service = crate::routes::federation::build_federation_service();
+    if !service.is_enabled() {
+        return;
+    }
+
+    let outbound =
+        crate::routes::federation::resolve_outbound_context(state, &service, guild_id, None).await;
+    if !outbound.uses_remote_mapping {
+        return;
+    }
+    let Some(peer) =
+        crate::routes::federation::resolve_remote_target_for_outbound_context(state, &outbound)
+            .await
+    else {
+        tracing::warn!(
+            "federation: no trusted remote origin for mirrored guild {} (namespace {:?})",
+            guild_id,
+            outbound.origin_server
+        );
+        return;
+    };
+    let Some(client) = crate::routes::federation::build_signed_federation_client(&service) else {
+        tracing::warn!("federation: signed client unavailable for leave rpc");
+        return;
+    };
+    let Some(local_identity) =
+        crate::routes::federation::local_federated_user_id(state, &service, user_id).await
+    else {
+        tracing::warn!(
+            "federation: cannot build local federated identity for user {}",
+            user_id
+        );
+        return;
+    };
+
+    let payload = FederationLeaveRequest {
+        origin_server: service.server_name().to_string(),
+        room_id: outbound.room_id,
+        user_id: local_identity,
+    };
+    let target = mercury_federation::client::FederationTarget::new(
+        &peer.federation_endpoint,
+        &peer.server_name,
+    );
+    if let Err(err) = client.send_leave(target, &payload).await {
+        tracing::warn!(
+            "federation: leave rpc failed for mirrored guild {} -> {} ({}): {}",
+            guild_id,
+            peer.server_name,
+            peer.domain,
+            err
+        );
+    }
+}

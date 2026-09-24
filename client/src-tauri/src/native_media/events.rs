@@ -3,13 +3,13 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use paracord_codec::crypto::{FrameDecryptor, KEY_SIZE};
-use paracord_transport::control::SessionParticipant;
+use mercury_codec::crypto::{FrameDecryptor, KEY_SIZE};
+use mercury_transport::control::SessionParticipant;
 use tokio::time::interval;
 
 use super::session::NativeMediaSession;
-use paracord_transport::control::ControlMessage;
-use paracord_transport::stream::{StreamId, TrackId};
+use mercury_transport::control::ControlMessage;
+use mercury_transport::stream::{StreamId, TrackId};
 
 /// Audio levels run 0 (loudest) to [`AUDIO_LEVEL_SILENCE`] (silence); see
 /// `audio_pipeline::compute_audio_level`. A speaker turns "on" only once clearly
@@ -444,7 +444,7 @@ async fn handle_control_message(
             std::collections::HashMap<i64, super::session::RemoteSessionParticipant>,
         >,
     >,
-    frame_encryptor: &std::sync::Arc<std::sync::Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: &std::sync::Arc<std::sync::Mutex<mercury_codec::crypto::FrameEncryptor>>,
     frame_decryptor: &std::sync::Arc<std::sync::Mutex<FrameDecryptor>>,
     track_sender_keys: &std::sync::Arc<
         tokio::sync::Mutex<
@@ -1056,7 +1056,7 @@ async fn send_control_over_connection(
 }
 
 fn rotate_audio_sender_key(
-    frame_encryptor: &std::sync::Arc<std::sync::Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: &std::sync::Arc<std::sync::Mutex<mercury_codec::crypto::FrameEncryptor>>,
     audio_sender_state: &std::sync::Arc<std::sync::Mutex<super::session::SenderKeyState>>,
     current_key_epoch: &std::sync::Arc<AtomicU8>,
     local_ssrc: u32,
@@ -1116,7 +1116,7 @@ async fn rotate_track_sender_keys(
             std::collections::HashMap<(StreamId, TrackId), super::session::SenderKeyState>,
         >,
     >,
-    frame_encryptor: &std::sync::Arc<std::sync::Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: &std::sync::Arc<std::sync::Mutex<mercury_codec::crypto::FrameEncryptor>>,
     frame_decryptor: &std::sync::Arc<std::sync::Mutex<FrameDecryptor>>,
     current_key_epoch: &std::sync::Arc<AtomicU8>,
 ) -> Result<(), String> {
@@ -1207,8 +1207,8 @@ async fn apply_delivered_track_key(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use paracord_transport::control::TrackKind;
-    use paracord_transport::stream::{
+    use mercury_transport::control::TrackKind;
+    use mercury_transport::stream::{
         PublishedLayer, PublishedTrack, TrackSubscription, VideoCodec,
     };
 

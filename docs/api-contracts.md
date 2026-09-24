@@ -1,6 +1,6 @@
-# Paracord API and Gateway Contracts (v1)
+# Archlast Mercury API and Gateway Contracts (v1)
 
-This document defines the baseline contracts for Paracord server and clients.
+This document defines the baseline contracts for Archlast Mercury server and clients.
 
 The canonical route inventory is generated at runtime from the Axum router:
 
@@ -520,7 +520,7 @@ before activating a recovery generation; see [Backup recovery](backup-recovery.m
 
 Authenticated WebSocket and SSE `READY`/`RESUMED` frames and
 `POST /api/v2/rt/session` publish `database_history_epoch`. HTTP responses publish
-`X-Paracord-History-Epoch`; CORS permits and exposes that header. A request carrying
+`X-Mercury-History-Epoch`; CORS permits and exposes that header. A request carrying
 a different epoch receives HTTP 409 with code `HISTORY_CHANGED` before handler
 execution. Invalid or duplicate epoch headers receive 400. Omission is supported
 for bootstrap and legacy clients; it provides no protection against stale requests.

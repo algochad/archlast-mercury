@@ -1,0 +1,59 @@
+[package]
+name = "mercury-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+
+[dependencies]
+mercury-contracts = { workspace = true }
+mercury-core = { workspace = true }
+mercury-models = { workspace = true }
+mercury-media = { workspace = true }
+mercury-db = { workspace = true }
+mercury-util = { workspace = true }
+mercury-federation = { workspace = true }
+mercury-relay = { workspace = true }
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+ed25519-dalek = { workspace = true }
+reqwest = { workspace = true }
+tokio-tungstenite = { workspace = true }
+jsonwebtoken = { workspace = true }
+mime_guess = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+totp-rs = { workspace = true }
+base64 = { workspace = true }
+tokio-util = "0.7"
+futures-util = "0.3"
+url = "2"
+dashmap = { workspace = true }
+moka = { workspace = true }
+lettre = { workspace = true }
+# Per-user rate limiting for the HTTP realtime command bus, mirroring the
+# gateway's governors so clients cannot bypass the WS limits over HTTP.
+governor = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tower = { workspace = true, features = ["util"] }
+sqlx = { workspace = true }
+# Test-only: lets the integration harness construct a real NativeMediaState
+# (bound QUIC endpoint + cert hash) so native voice routes exercise the full
+# native contract, including cert_hash.
+mercury-transport = { workspace = true }
+# Test-only: the relay's datagram API is expressed in `Bytes`, so a test that
+# registers a live connection against the shared RelayForwarder needs it.
+bytes = { workspace = true }

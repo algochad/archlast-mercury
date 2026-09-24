@@ -1,6 +1,6 @@
 # Bot Development Quickstart
 
-This guide covers the current Paracord bot flow end-to-end:
+This guide covers the current Archlast Mercury bot flow end-to-end:
 
 1. Create a bot application in `Developer Portal` (`/app/developers`).
 2. Copy the generated bot token immediately (it is only shown on creation or regeneration).
@@ -15,7 +15,7 @@ This guide covers the current Paracord bot flow end-to-end:
 
 ## OAuth-style install link
 
-Paracord supports an authorization page at:
+Archlast Mercury supports an authorization page at:
 
 `/app/oauth2/authorize?client_id=<APP_ID>&permissions=<PERMISSIONS>`
 
@@ -24,7 +24,7 @@ Optional query params:
 - `redirect_uri`: must match the application redirect URI exactly.
 - `state`: opaque value returned to the redirect target.
 
-After authorization, Paracord can redirect back with:
+After authorization, Archlast Mercury can redirect back with:
 
 - `authorized=true`
 - `application_id=<APP_ID>`
@@ -65,7 +65,7 @@ Installed command discovery for users is exposed at:
 GET /api/v1/guilds/<GUILD_ID>/commands
 ```
 
-When a user invokes a command, Paracord creates an interaction and dispatches an
+When a user invokes a command, Archlast Mercury creates an interaction and dispatches an
 `INTERACTION_CREATE` gateway event to the bot. The bot responds with the
 interaction token:
 
@@ -84,18 +84,18 @@ Followup and original-response APIs are also available:
 
 ## TypeScript SDK
 
-The SDK package is in `packages/paracord-bot-sdk` and wraps command sync,
+The SDK package is in `packages/archlast-mercury-bot-sdk` and wraps command sync,
 gateway identify/heartbeat/resume, interaction routing, replies, defers, edits,
 and followups.
 
 For local development against the default server port:
 
 ```ts
-import { BotClient, InteractionResponseBuilder, SlashCommandBuilder } from '@paracord/bot-sdk';
+import { BotClient, InteractionResponseBuilder, SlashCommandBuilder } from 'archlast-mercury-bot-sdk';
 
 const bot = new BotClient({
-  token: process.env.PARACORD_BOT_TOKEN!,
-  applicationId: process.env.PARACORD_APP_ID!,
+  token: process.env.MERCURY_BOT_TOKEN!,
+  applicationId: process.env.MERCURY_APP_ID!,
   restBaseUrl: 'http://localhost:8090/api/v1',
   gatewayUrl: 'ws://localhost:8090/gateway',
 });
@@ -116,7 +116,7 @@ await bot.start({ syncCommands: true });
 curl -X POST "http://localhost:8090/api/v1/channels/<CHANNEL_ID>/messages" \
   -H "Authorization: Bot <TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"content":"Hello from my Paracord bot"}'
+  -d '{"content":"Hello from my Archlast Mercury bot"}'
 ```
 
 ## Security notes

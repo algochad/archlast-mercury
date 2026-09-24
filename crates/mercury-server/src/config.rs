@@ -1,0 +1,1884 @@
+use anyhow::Result;
+use mercury_media::S3Config;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::fs;
+
+fn harden_secret_file_permissions(path: &str) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+    }
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+
+        let principal_output = Command::new("whoami").output()?;
+        if principal_output.status.success() {
+            let principal = String::from_utf8_lossy(&principal_output.stdout)
+                .trim()
+                .to_string();
+            if !principal.is_empty() {
+                let _ = Command::new("icacls")
+                    .args([path, "/inheritance:r"])
+                    .status();
+                let _ = Command::new("icacls")
+                    .args([path, "/grant:r", &format!("{principal}:F")])
+                    .status();
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct Config {
+    pub server: ServerConfig,
+    pub database: DatabaseConfig,
+    pub auth: AuthConfig,
+    pub storage: StorageConfig,
+    #[serde(default)]
+    pub media: MediaConfig,
+    /// Optional S3-compatible object storage configuration.
+    /// Activated when `storage.storage_type = "s3"`.
+    #[serde(default)]
+    pub s3: S3Config,
+    #[serde(default)]
+    pub livekit: LiveKitConfig,
+    #[serde(default)]
+    pub voice: VoiceConfig,
+    #[serde(default)]
+    pub federation: FederationConfig,
+    #[serde(default)]
+    pub network: NetworkConfig,
+    #[serde(default)]
+    pub tls: TlsConfig,
+    #[serde(default)]
+    pub retention: RetentionConfig,
+    #[serde(default)]
+    pub at_rest: AtRestConfig,
+    #[serde(default)]
+    pub backup: BackupConfig,
+    #[serde(default)]
+    pub ai: AiConfig,
+    #[serde(default)]
+    pub integrations: IntegrationsConfig,
+    #[serde(default)]
+    pub setup: SetupConfig,
+    /// True when `Config::load` generated the config file fresh on this run
+    /// (genuine first run). Not persisted; always deserializes to false.
+    /// Consumed by the startup path (main.rs) to drive first-run onboarding.
+    /// SETUP-3 wiring: read `config.first_run` after `Config::load(...)` returns.
+    #[serde(skip)]
+    pub first_run: bool,
+    /// Set from `PARACORD_SPORTS_REPLAY`. Never written to the config file.
+    #[serde(skip)]
+    pub sports_replay: Option<SportsReplaySettings>,
+}
+
+/// Games to replay and how many game-seconds pass per real second.
+#[derive(Debug, Clone)]
+pub struct SportsReplaySettings {
+    pub games: Vec<mercury_core::sports::ReplayGame>,
+    pub speed: f64,
+    /// Virtual wallclock at process start. None begins before the first play.
+    pub start: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ServerConfig {
+    pub bind_address: String,
+    #[serde(default = "default_server_name")]
+    pub server_name: String,
+    /// Max entries for the permission cache in `paracord-core`.
+    #[serde(default = "default_permission_cache_max_entries")]
+    pub permission_cache_max_entries: u64,
+    /// Optional path to a directory containing the built web UI
+    pub web_dir: Option<String>,
+    /// Public URL of this server (e.g., https://chat.example.com).
+    /// Used for CORS auto-configuration and invite links.
+    pub public_url: Option<String>,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            bind_address: "0.0.0.0:8090".into(),
+            server_name: default_server_name(),
+            permission_cache_max_entries: default_permission_cache_max_entries(),
+            web_dir: None,
+            public_url: None,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DatabaseConfig {
+    #[serde(default = "default_database_engine")]
+    pub engine: DatabaseEngine,
+    pub url: String,
+    #[serde(default = "default_max_connections")]
+    pub max_connections: u32,
+    /// Statement timeout in seconds for PostgreSQL connections (0 = disabled).
+    #[serde(default)]
+    pub statement_timeout_secs: u64,
+    /// Idle-in-transaction timeout in seconds for PostgreSQL (0 = disabled).
+    #[serde(default)]
+    pub idle_in_transaction_timeout_secs: u64,
+    /// Per-connection PostgreSQL `work_mem` in MB (0 = use server default).
+    #[serde(default)]
+    pub work_mem_mb: u32,
+    /// Per-connection PostgreSQL `maintenance_work_mem` in MB (0 = use server default).
+    #[serde(default)]
+    pub maintenance_work_mem_mb: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DatabaseEngine {
+    Sqlite,
+    Postgres,
+}
+
+impl Default for DatabaseEngine {
+    fn default() -> Self {
+        Self::Sqlite
+    }
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            engine: default_database_engine(),
+            url: "sqlite://./data/mercury.db?mode=rwc".into(),
+            max_connections: default_max_connections(),
+            statement_timeout_secs: 0,
+            idle_in_transaction_timeout_secs: 0,
+            work_mem_mb: 0,
+            maintenance_work_mem_mb: 0,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AuthConfig {
+    pub jwt_secret: String,
+    #[serde(default = "default_jwt_expiry")]
+    pub jwt_expiry_seconds: u64,
+    #[serde(default = "default_true")]
+    pub registration_enabled: bool,
+    #[serde(default = "default_true")]
+    pub allow_username_login: bool,
+    #[serde(default = "default_false")]
+    pub require_email: bool,
+    #[serde(default = "default_false")]
+    pub require_email_verification: bool,
+}
+
+impl Default for AuthConfig {
+    fn default() -> Self {
+        Self {
+            jwt_secret: generate_random_hex(64),
+            jwt_expiry_seconds: default_jwt_expiry(),
+            registration_enabled: true,
+            allow_username_login: true,
+            require_email: false,
+            require_email_verification: false,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct StorageConfig {
+    #[serde(default = "default_storage_type")]
+    pub storage_type: String,
+    #[serde(default = "default_storage_path")]
+    pub path: String,
+    #[serde(default = "default_max_upload_size")]
+    pub max_upload_size: u64,
+    #[serde(default = "default_max_guild_storage_quota")]
+    pub max_guild_storage_quota: u64,
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            storage_type: default_storage_type(),
+            path: default_storage_path(),
+            max_upload_size: default_max_upload_size(),
+            max_guild_storage_quota: default_max_guild_storage_quota(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MediaConfig {
+    #[serde(default = "default_media_storage_path")]
+    pub storage_path: String,
+    #[serde(default = "default_max_file_size")]
+    pub max_file_size: u64,
+    #[serde(default = "default_p2p_threshold")]
+    pub p2p_threshold: u64,
+}
+
+/// Native QUIC-based voice/video media server configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VoiceConfig {
+    /// Enable the native QUIC media server (the primary media path; LiveKit is
+    /// an optional fallback). Defaults to true so native media works with zero config.
+    #[serde(default = "default_true")]
+    pub native_media: bool,
+    /// UDP port for the unified QUIC media endpoint.
+    /// Defaults to the same port as TLS (8443) — TCP serves HTTPS while
+    /// UDP on the same port handles both raw QUIC and WebTransport (via ALPN).
+    /// Server admins only need to forward one port (TCP+UDP) for full functionality.
+    #[serde(default = "default_voice_port")]
+    pub port: u16,
+    /// Maximum participants per voice room.
+    #[serde(default = "default_voice_max_participants")]
+    pub max_participants_per_room: u32,
+    /// Opus bitrate in bits/s.
+    #[serde(default = "default_voice_audio_bitrate")]
+    pub audio_bitrate: u32,
+    /// Require E2EE sender key exchange for all media sessions.
+    #[serde(default = "default_true")]
+    pub e2ee_required: bool,
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self {
+            native_media: true,
+            port: default_voice_port(),
+            max_participants_per_room: default_voice_max_participants(),
+            audio_bitrate: default_voice_audio_bitrate(),
+            e2ee_required: true,
+        }
+    }
+}
+
+impl Default for MediaConfig {
+    fn default() -> Self {
+        Self {
+            storage_path: default_media_storage_path(),
+            max_file_size: default_max_file_size(),
+            p2p_threshold: default_p2p_threshold(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LiveKitConfig {
+    #[serde(default = "default_livekit_key")]
+    pub api_key: String,
+    #[serde(default = "default_livekit_secret")]
+    pub api_secret: String,
+    #[serde(default = "default_livekit_url")]
+    pub url: String,
+    #[serde(default = "default_livekit_http_url")]
+    pub http_url: String,
+    /// Public LiveKit URL sent to clients (e.g., wss://chat.example.com/livekit).
+    /// Falls back to `url` if not set.
+    pub public_url: Option<String>,
+    /// UDP port LiveKit's TURN relay listens on.
+    ///
+    /// TURN is a *second* UDP listener, not a view of the RTC one: LiveKit
+    /// binds both, and binding the same port twice fails the process at
+    /// startup ("could not listen on TURN UDP port … address already in use"),
+    /// so LiveKit mode could not start at all. Left unset it takes the port
+    /// after LiveKit's RTC mux, and the relay range moves up to make room.
+    /// Set it when that neighbour is already spoken for; it is a port an
+    /// operator must forward alongside the media port.
+    pub turn_udp_port: Option<u16>,
+}
+
+impl Default for LiveKitConfig {
+    fn default() -> Self {
+        Self {
+            api_key: format!("mercury_{}", generate_random_hex(8)),
+            api_secret: generate_random_hex(32),
+            url: default_livekit_url(),
+            http_url: default_livekit_http_url(),
+            public_url: None,
+            turn_udp_port: None,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NetworkConfig {
+    /// On Windows, automatically add local firewall allow rules on startup.
+    #[serde(default = "default_false")]
+    pub windows_firewall_auto_allow: bool,
+    /// Ask the router, on startup, to let people outside this network reach the
+    /// server (UPnP IGD, then NAT-PMP/PCP). On by default: without it a
+    /// first-time owner has to log into their router before a single friend
+    /// outside the house can join, which is the one step nothing else can
+    /// automate away. Exposure is safe by default because an unclaimed server
+    /// refuses every registration until its owner finishes setup.
+    #[serde(default = "default_true")]
+    pub auto_port_forward: bool,
+    /// How long each requested mapping should last, in seconds. Refreshed at
+    /// half this interval for as long as the server runs, so a router reboot
+    /// costs at most half a lease.
+    #[serde(default = "default_port_forward_lease_seconds")]
+    pub port_forward_lease_seconds: u32,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            windows_firewall_auto_allow: false,
+            auto_port_forward: true,
+            port_forward_lease_seconds: default_port_forward_lease_seconds(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TlsConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_tls_port")]
+    pub port: u16,
+    #[serde(default = "default_cert_path")]
+    pub cert_path: String,
+    #[serde(default = "default_key_path")]
+    pub key_path: String,
+    #[serde(default = "default_true")]
+    pub auto_generate: bool,
+    #[serde(default)]
+    pub acme: TlsAcmeConfig,
+}
+
+impl Default for TlsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            port: default_tls_port(),
+            cert_path: default_cert_path(),
+            key_path: default_key_path(),
+            auto_generate: true,
+            acme: TlsAcmeConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TlsAcmeConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_acme_client_path")]
+    pub client_path: String,
+    #[serde(default = "default_acme_directory_url")]
+    pub directory_url: String,
+    pub email: Option<String>,
+    #[serde(default)]
+    pub domains: Vec<String>,
+    #[serde(default = "default_acme_webroot_path")]
+    pub webroot_path: String,
+    #[serde(default = "default_acme_cert_name")]
+    pub cert_name: String,
+    pub cert_source_path: Option<String>,
+    pub key_source_path: Option<String>,
+    #[serde(default)]
+    pub additional_args: Vec<String>,
+    #[serde(default = "default_true")]
+    pub serve_http_challenge: bool,
+    #[serde(default = "default_true")]
+    pub auto_renew: bool,
+    #[serde(default = "default_acme_renew_interval_seconds")]
+    pub renew_interval_seconds: u64,
+}
+
+impl Default for TlsAcmeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            client_path: default_acme_client_path(),
+            directory_url: default_acme_directory_url(),
+            email: None,
+            domains: Vec::new(),
+            webroot_path: default_acme_webroot_path(),
+            cert_name: default_acme_cert_name(),
+            cert_source_path: None,
+            key_source_path: None,
+            additional_args: Vec::new(),
+            serve_http_challenge: true,
+            auto_renew: true,
+            renew_interval_seconds: default_acme_renew_interval_seconds(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RetentionConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_retention_interval_seconds")]
+    pub interval_seconds: u64,
+    #[serde(default = "default_retention_batch_size")]
+    pub batch_size: i64,
+    pub message_days: Option<i64>,
+    pub attachment_days: Option<i64>,
+    pub audit_log_days: Option<i64>,
+    pub security_event_days: Option<i64>,
+    pub session_days: Option<i64>,
+}
+
+impl Default for RetentionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval_seconds: default_retention_interval_seconds(),
+            batch_size: default_retention_batch_size(),
+            message_days: None,
+            attachment_days: None,
+            audit_log_days: None,
+            security_event_days: Some(30),
+            session_days: Some(30),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AtRestConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_at_rest_key_env")]
+    pub key_env: String,
+    #[serde(default = "default_false")]
+    pub encrypt_sqlite: bool,
+    #[serde(default = "default_false")]
+    pub encrypt_files: bool,
+    #[serde(default = "default_false")]
+    pub allow_plaintext_file_reads: bool,
+}
+
+impl Default for AtRestConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            key_env: default_at_rest_key_env(),
+            encrypt_sqlite: false,
+            encrypt_files: false,
+            allow_plaintext_file_reads: false,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FederationConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    pub domain: Option<String>,
+    #[serde(default = "default_federation_signing_key_path")]
+    pub signing_key_path: Option<String>,
+    #[serde(default = "default_false")]
+    pub allow_discovery: bool,
+    #[serde(default = "default_max_events_per_peer_per_minute")]
+    pub max_events_per_peer_per_minute: Option<u32>,
+    #[serde(default = "default_max_user_creates_per_peer_per_hour")]
+    pub max_user_creates_per_peer_per_hour: Option<u32>,
+    #[serde(default = "default_false")]
+    pub file_cache_enabled: bool,
+    #[serde(default = "default_federation_file_cache_max_size")]
+    pub file_cache_max_size: u64,
+    #[serde(default = "default_federation_file_cache_ttl_hours")]
+    pub file_cache_ttl_hours: u64,
+}
+
+impl Default for FederationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            domain: None,
+            signing_key_path: default_federation_signing_key_path(),
+            allow_discovery: false,
+            max_events_per_peer_per_minute: default_max_events_per_peer_per_minute(),
+            max_user_creates_per_peer_per_hour: default_max_user_creates_per_peer_per_hour(),
+            file_cache_enabled: false,
+            file_cache_max_size: default_federation_file_cache_max_size(),
+            file_cache_ttl_hours: default_federation_file_cache_ttl_hours(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BackupConfig {
+    #[serde(default = "default_backup_dir")]
+    pub backup_dir: String,
+    #[serde(default = "default_false")]
+    pub auto_backup_enabled: bool,
+    #[serde(default = "default_auto_backup_interval")]
+    pub auto_backup_interval_seconds: u64,
+    #[serde(default = "default_true")]
+    pub include_media: bool,
+    #[serde(default = "default_max_backups")]
+    pub max_backups: u32,
+}
+
+impl Default for BackupConfig {
+    fn default() -> Self {
+        Self {
+            backup_dir: default_backup_dir(),
+            auto_backup_enabled: true,
+            auto_backup_interval_seconds: default_auto_backup_interval(),
+            include_media: true,
+            max_backups: default_max_backups(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AiConfig {
+    /// Provider id: openai, anthropic, ollama, or openai_compatible.
+    pub provider: Option<String>,
+    /// Provider API base URL.
+    pub base_url: Option<String>,
+    /// API key for provider auth (if required).
+    pub api_key: Option<String>,
+    /// Default model used for summarize/catch-up requests.
+    pub model: Option<String>,
+    #[serde(default = "default_ai_timeout_seconds")]
+    pub timeout_seconds: u64,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            provider: None,
+            base_url: None,
+            api_key: None,
+            model: None,
+            timeout_seconds: default_ai_timeout_seconds(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct IntegrationsConfig {
+    /// Tenor API v2 key for GIF search. Obtain from Google Cloud Console.
+    pub tenor_api_key: Option<String>,
+}
+
+/// First-owner claim ("who owns this server") settings.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SetupConfig {
+    /// Whether an unclaimed instance must be claimed with a bootstrap token
+    /// before any account can exist.
+    ///
+    /// `true` (the default) is the safe behaviour: a freshly exposed server
+    /// cannot be taken over by whoever finds the URL first. Setting it to
+    /// `false` restores the legacy bootstrap in which the first registered
+    /// account becomes the owner — deterministic, which is why automated
+    /// harnesses and unattended container deployments use it, and loudly
+    /// logged at startup so it is never a silent choice.
+    #[serde(default = "default_true")]
+    pub require_claim: bool,
+    /// A fixed bootstrap claim token, instead of one minted at startup.
+    ///
+    /// Set this when the token has to be known in advance (a provisioning
+    /// system, an end-to-end harness). It is a credential: it must be at least
+    /// 32 characters and it is stored hashed, never in plaintext, in the
+    /// database.
+    pub claim_token: Option<String>,
+}
+
+impl Default for SetupConfig {
+    fn default() -> Self {
+        Self {
+            require_claim: true,
+            claim_token: None,
+        }
+    }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Generate a cryptographically random hex string of the given length.
+fn generate_random_hex(len: usize) -> String {
+    let mut rng = rand::thread_rng();
+    (0..len)
+        .map(|_| {
+            let idx = rng.gen_range(0..16u8);
+            char::from(if idx < 10 {
+                b'0' + idx
+            } else {
+                b'a' + idx - 10
+            })
+        })
+        .collect()
+}
+
+fn default_server_name() -> String {
+    "localhost".into()
+}
+fn default_database_engine() -> DatabaseEngine {
+    DatabaseEngine::Sqlite
+}
+fn default_max_connections() -> u32 {
+    20
+}
+fn default_permission_cache_max_entries() -> u64 {
+    10_000
+}
+fn default_jwt_expiry() -> u64 {
+    900
+}
+fn default_true() -> bool {
+    true
+}
+fn default_false() -> bool {
+    false
+}
+fn default_port_forward_lease_seconds() -> u32 {
+    3600
+}
+fn default_storage_type() -> String {
+    "local".into()
+}
+fn default_storage_path() -> String {
+    "./data/uploads".into()
+}
+fn default_max_upload_size() -> u64 {
+    52_428_800 // 50MB
+}
+fn default_media_storage_path() -> String {
+    "./data/files".into()
+}
+fn default_max_file_size() -> u64 {
+    1_073_741_824 // 1GB
+}
+fn default_p2p_threshold() -> u64 {
+    1_073_741_824 // 1GB
+}
+fn default_livekit_key() -> String {
+    format!("mercury_{}", generate_random_hex(16))
+}
+fn default_livekit_secret() -> String {
+    generate_random_hex(64)
+}
+fn default_livekit_url() -> String {
+    "ws://127.0.0.1:7880".into()
+}
+fn default_livekit_http_url() -> String {
+    "http://127.0.0.1:7880".into()
+}
+fn default_voice_port() -> u16 {
+    8443
+}
+fn default_voice_max_participants() -> u32 {
+    50
+}
+fn default_voice_audio_bitrate() -> u32 {
+    96_000
+}
+fn default_tls_port() -> u16 {
+    8443
+}
+fn default_cert_path() -> String {
+    "./data/certs/cert.pem".into()
+}
+fn default_key_path() -> String {
+    "./data/certs/key.pem".into()
+}
+fn default_acme_client_path() -> String {
+    "certbot".into()
+}
+fn default_acme_directory_url() -> String {
+    "https://acme-v02.api.letsencrypt.org/directory".into()
+}
+fn default_acme_webroot_path() -> String {
+    "./data/acme-webroot".into()
+}
+fn default_acme_cert_name() -> String {
+    "paracord".into()
+}
+fn default_acme_renew_interval_seconds() -> u64 {
+    43_200
+}
+fn default_retention_interval_seconds() -> u64 {
+    3600
+}
+fn default_retention_batch_size() -> i64 {
+    256
+}
+fn default_at_rest_key_env() -> String {
+    "MERCURY_AT_REST_KEY".into()
+}
+fn default_federation_signing_key_path() -> Option<String> {
+    Some("./data/federation_signing_key.hex".into())
+}
+fn default_max_events_per_peer_per_minute() -> Option<u32> {
+    Some(120)
+}
+fn default_max_user_creates_per_peer_per_hour() -> Option<u32> {
+    Some(100)
+}
+fn default_max_guild_storage_quota() -> u64 {
+    5_368_709_120 // 5GB
+}
+fn default_federation_file_cache_max_size() -> u64 {
+    1_073_741_824 // 1GB
+}
+fn default_federation_file_cache_ttl_hours() -> u64 {
+    168 // 7 days
+}
+fn default_backup_dir() -> String {
+    "./data/backups".into()
+}
+fn default_auto_backup_interval() -> u64 {
+    86_400 // 24 hours
+}
+fn default_max_backups() -> u32 {
+    10
+}
+fn default_ai_timeout_seconds() -> u64 {
+    20
+}
+
+/// Prefer new-prefix env, fall back to old prefix with a warning.
+fn env_with_fallback(new: &str, old: &str) -> Option<String> {
+    if let Ok(v) = std::env::var(new) { return Some(v); }
+    if let Ok(v) = std::env::var(old) {
+        tracing::warn!("{old} is deprecated; use {new}");
+        return Some(v);
+    }
+    None
+}
+
+
+fn looks_like_placeholder_secret(raw: &str) -> bool {
+    let normalized = raw.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        return true;
+    }
+    normalized.contains("change_me")
+        || normalized.contains("replace_me")
+        || normalized.contains("replace_with")
+        || normalized.starts_with("example")
+        || normalized == "devkey"
+        || normalized == "devsecret"
+        || normalized == "secret"
+        // Legacy config/paracord.toml value. It was a publicly known,
+        // repository-shipped development secret and must never be accepted for
+        // a running server, regardless of its length.
+        || normalized == "mercury_dev_secret_key_change_in_production_1234567890abcdef"
+        // Known secret shipped in docker-compose.yml. Reject it so a copied
+        // repo default can never pass validation, even when public_url is set.
+        || normalized.contains("paracord-local-dev")
+        // Previously-shipped LiveKit dev API secret. It was a publicly known,
+        // repository-shipped development value and must never pass validation.
+        || normalized == "mercury_secret_key_at_least_32chars!"
+}
+
+fn validate_secret_configuration(config: &Config) -> Result<()> {
+    let jwt_secret = config.auth.jwt_secret.trim();
+    if jwt_secret.len() < 32 || looks_like_placeholder_secret(jwt_secret) {
+        anyhow::bail!(
+            "Invalid auth.jwt_secret: use a strong random secret (at least 32 characters) and never leave placeholder values"
+        );
+    }
+
+    // LiveKit is only a fallback. When native media is the active path (the
+    // default), placeholder/empty LiveKit credentials must not block startup.
+    // Only enforce the LiveKit secret check for LiveKit-only operators.
+    if !config.voice.native_media {
+        let lk_key = config.livekit.api_key.trim();
+        let lk_secret = config.livekit.api_secret.trim();
+        if looks_like_placeholder_secret(lk_key) || looks_like_placeholder_secret(lk_secret) {
+            anyhow::bail!(
+                "Invalid livekit credentials: replace placeholder api_key/api_secret values before startup"
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Generate a commented config file template with the given values filled in.
+fn generate_config_template(config: &Config) -> String {
+    format!(
+        r#"# Paracord Server Configuration
+# Generated automatically on first run. Edit as needed.
+
+[server]
+bind_address = "{bind_address}"
+server_name = "{server_name}"
+permission_cache_max_entries = {permission_cache_max_entries}
+# Set explicitly for internet-facing deployments:
+# public_url = "https://your-domain-or-ip:8443"
+
+[database]
+engine = "{db_engine}"
+url = "{db_url}"
+# Connection pool size. Every in-flight handler holds one connection for as long
+# as it is querying, so this is also the cap on concurrent database work: set it
+# too low and a handful of slow requests starve everything else. Waiting for a
+# free slot is bounded (5s) rather than queued indefinitely.
+max_connections = {max_connections}
+# Optional PostgreSQL per-connection tuning (0 keeps server defaults).
+work_mem_mb = {work_mem_mb}
+maintenance_work_mem_mb = {maintenance_work_mem_mb}
+
+[auth]
+jwt_secret = "{jwt_secret}"
+jwt_expiry_seconds = {jwt_expiry}
+registration_enabled = {registration_enabled}
+# Allow username logins for password auth (in addition to email).
+allow_username_login = {allow_username_login}
+# Require email during password registration.
+require_email = {require_email}
+
+[setup]
+# Require the first-owner claim. While an instance is unclaimed nobody can
+# register: the operator finishes setup in the browser using the one-time claim
+# token this server prints on startup (and writes to first-owner-claim.txt next
+# to this file). That is what stops a stranger who finds a freshly exposed
+# server from becoming its administrator.
+#
+# Set to false ONLY for automated or unattended deployments where the first
+# account is created by a script you control: the first account registered then
+# owns the instance, exactly as older Paracord releases behaved.
+require_claim = {setup_require_claim}
+# Pin the bootstrap claim token instead of letting the server mint one. Useful
+# for provisioning systems and end-to-end harnesses. Minimum 32 characters; it
+# is stored hashed, never in plaintext.
+# claim_token = "replace-with-at-least-32-random-characters"
+
+[storage]
+# Upload storage backend: "local" (default) or optional S3-compatible object storage.
+# S3-compatible storage is disabled by default. To enable it, set storage_type = "s3",
+# configure the [s3] section below, and build the server with `--features s3`.
+storage_type = "{storage_type}"
+path = "{storage_path}"
+# Maximum size (bytes) of a single upload/attachment. Enforced server-side on
+# every upload path; clients read this value to pre-validate and show the limit.
+# Default 52428800 (50 MB). Example: 104857600 = 100 MB.
+max_upload_size = {max_upload_size}
+# Maximum total stored bytes per guild (0 = unlimited). Default 10737418240 (10 GB).
+max_guild_storage_quota = {max_guild_storage_quota}
+
+# [s3]
+# # Optional S3-compatible object storage (MinIO, Cloudflare R2, AWS S3,
+# # DigitalOcean Spaces, etc.).
+# # Only used when storage.storage_type = "s3".
+# bucket = "paracord-uploads"
+# region = "us-east-1"
+# # Custom endpoint for non-default providers:
+# # endpoint_url = "https://minio.example.com"
+# # force_path_style = true
+# # access_key_id = "your-access-key"
+# # secret_access_key = "your-secret-key"
+# # Disabled by default. Set true only when intentionally using AWS env/profile/
+# # SSO/instance-role credentials instead of explicit keys above.
+# # use_aws_credential_chain = false
+# # Optional key prefix for all objects:
+# # prefix = "paracord/"
+# # Optional CDN base URL (skips presigned URLs):
+# # cdn_url = "https://cdn.example.com"
+# # Presigned URL expiry (default 3600s):
+# # presign_expiry_seconds = 3600
+
+[media]
+storage_path = "{media_path}"
+max_file_size = {max_file_size}
+p2p_threshold = {p2p_threshold}
+
+[voice]
+# Native QUIC/WebTransport voice stack. Enabled by default — this is the primary
+# media path and works out of the box with zero extra configuration. The [livekit]
+# section below is an optional fallback that operators can safely ignore. Set this
+# to false only to run a LiveKit-only deployment.
+# Env override: PARACORD_VOICE_NATIVE_MEDIA
+native_media = {voice_native_media}
+# Unified UDP port for raw QUIC desktop clients and browser WebTransport.
+# Forward this port over UDP in addition to the HTTPS TCP port.
+# Env override: PARACORD_VOICE_PORT
+port = {voice_port}
+# Env override: PARACORD_VOICE_MAX_PARTICIPANTS_PER_ROOM
+max_participants_per_room = {voice_max_participants}
+# Env override: PARACORD_VOICE_AUDIO_BITRATE
+audio_bitrate = {voice_audio_bitrate}
+# Env override: PARACORD_VOICE_E2EE_REQUIRED
+e2ee_required = {voice_e2ee_required}
+
+[livekit]
+# Optional fallback media server. Ignored while [voice] native_media = true.
+# These credentials are auto-generated so LiveKit works if you ever opt in.
+api_key = "{lk_key}"
+api_secret = "{lk_secret}"
+url = "{lk_url}"
+http_url = "{lk_http_url}"
+# Optional public URL sent to clients:
+# public_url = "wss://your-domain-or-ip:8443/livekit"
+
+[federation]
+enabled = {federation_enabled}
+# domain = "chat.example.com"
+# Hex-encoded ed25519 private key file used for federation request signing.
+signing_key_path = "{federation_signing_key_path}"
+allow_discovery = {federation_allow_discovery}
+# Per-peer rate limit for inbound federation events (per minute). Set to 0 to disable.
+# max_events_per_peer_per_minute = 120
+# Per-peer rate limit for remote user creation (per hour). Set to 0 to disable.
+# max_user_creates_per_peer_per_hour = 100
+
+[network]
+# On Windows, optionally auto-create local firewall allow rules.
+windows_firewall_auto_allow = {windows_firewall_auto_allow}
+# Ask your router to let friends outside your home network reach this server, so
+# you never have to open its settings page yourself. Set to false if you would
+# rather set up port forwarding by hand (see docs/port-forwarding.md).
+# Env override: PARACORD_AUTO_PORT_FORWARD
+auto_port_forward = {auto_port_forward}
+# How long each router entry lasts, in seconds. It is refreshed automatically
+# while the server runs. Env override: PARACORD_PORT_FORWARD_LEASE_SECONDS
+port_forward_lease_seconds = {port_forward_lease_seconds}
+
+[tls]
+# HTTPS support — required for getUserMedia() on non-localhost origins.
+# A self-signed certificate is auto-generated on first run.
+enabled = {tls_enabled}
+port = {tls_port}
+cert_path = "{tls_cert}"
+key_path = "{tls_key}"
+auto_generate = {tls_auto}
+
+[tls.acme]
+# Optional ACME automation (certbot HTTP-01 webroot flow).
+enabled = {acme_enabled}
+client_path = "{acme_client_path}"
+directory_url = "{acme_directory_url}"
+# email = "ops@example.com"
+# domains = ["chat.example.com"]
+webroot_path = "{acme_webroot_path}"
+cert_name = "{acme_cert_name}"
+# Optional source overrides if your ACME client writes certs elsewhere.
+# cert_source_path = "/etc/letsencrypt/live/paracord/fullchain.pem"
+# key_source_path = "/etc/letsencrypt/live/paracord/privkey.pem"
+serve_http_challenge = {acme_serve_http_challenge}
+auto_renew = {acme_auto_renew}
+renew_interval_seconds = {acme_renew_interval_seconds}
+# additional_args = ["--preferred-challenges", "http"]
+
+[retention]
+# Data retention purge worker. Disabled by default.
+enabled = {retention_enabled}
+# How often to run retention jobs.
+interval_seconds = {retention_interval}
+# Maximum rows handled per category per tick.
+batch_size = {retention_batch}
+# Set to integer day values to enable each retention policy.
+# message_days = 180
+# attachment_days = 30
+# audit_log_days = 365
+# security_event_days = 180
+# session_days = 90
+
+[at_rest]
+# Optional encryption-at-rest profile. Disabled by default.
+enabled = {at_rest_enabled}
+# Name of environment variable that contains the 32-byte master key
+# (hex or base64 encoded).
+key_env = "{at_rest_key_env}"
+# SQLCipher mode for SQLite (requires SQLCipher-enabled SQLite build).
+encrypt_sqlite = {at_rest_encrypt_sqlite}
+# AES-256-GCM encryption for attachment payload bytes on disk.
+encrypt_files = {at_rest_encrypt_files}
+# During migration, allow reading older plaintext attachment files.
+allow_plaintext_file_reads = {at_rest_allow_plaintext}
+
+[backup]
+# Backup configuration.
+backup_dir = "{backup_dir}"
+# Enable automatic periodic backups.
+auto_backup_enabled = {backup_auto_enabled}
+# Interval between automatic backups in seconds (default: 86400 = 24h).
+auto_backup_interval_seconds = {backup_interval}
+# Include media files (uploads, files) in backups.
+include_media = {backup_include_media}
+# Maximum number of backups to keep (oldest are pruned).
+max_backups = {backup_max_backups}
+
+[ai]
+# Optional AI provider configuration used by summarize/catch-up features.
+# Supported providers: "openai", "anthropic", "ollama", "openai_compatible"
+# provider = "openai"
+# base_url = "https://api.openai.com"
+# api_key = "replace-with-provider-key"
+# model = "gpt-4o-mini"
+timeout_seconds = {ai_timeout_seconds}
+"#,
+        bind_address = config.server.bind_address,
+        server_name = config.server.server_name,
+        permission_cache_max_entries = config.server.permission_cache_max_entries,
+        db_engine = match config.database.engine {
+            DatabaseEngine::Sqlite => "sqlite",
+            DatabaseEngine::Postgres => "postgres",
+        },
+        db_url = config.database.url,
+        max_connections = config.database.max_connections,
+        work_mem_mb = config.database.work_mem_mb,
+        maintenance_work_mem_mb = config.database.maintenance_work_mem_mb,
+        jwt_secret = config.auth.jwt_secret,
+        jwt_expiry = config.auth.jwt_expiry_seconds,
+        registration_enabled = config.auth.registration_enabled,
+        setup_require_claim = config.setup.require_claim,
+        allow_username_login = config.auth.allow_username_login,
+        require_email = config.auth.require_email,
+        storage_type = config.storage.storage_type,
+        storage_path = config.storage.path,
+        max_upload_size = config.storage.max_upload_size,
+        max_guild_storage_quota = config.storage.max_guild_storage_quota,
+        media_path = config.media.storage_path,
+        max_file_size = config.media.max_file_size,
+        p2p_threshold = config.media.p2p_threshold,
+        voice_native_media = config.voice.native_media,
+        voice_port = config.voice.port,
+        voice_max_participants = config.voice.max_participants_per_room,
+        voice_audio_bitrate = config.voice.audio_bitrate,
+        voice_e2ee_required = config.voice.e2ee_required,
+        lk_key = config.livekit.api_key,
+        lk_secret = config.livekit.api_secret,
+        lk_url = config.livekit.url,
+        lk_http_url = config.livekit.http_url,
+        federation_enabled = config.federation.enabled,
+        federation_signing_key_path = config
+            .federation
+            .signing_key_path
+            .as_deref()
+            .unwrap_or("./data/federation_signing_key.hex"),
+        federation_allow_discovery = config.federation.allow_discovery,
+        windows_firewall_auto_allow = config.network.windows_firewall_auto_allow,
+        auto_port_forward = config.network.auto_port_forward,
+        port_forward_lease_seconds = config.network.port_forward_lease_seconds,
+        tls_enabled = config.tls.enabled,
+        tls_port = config.tls.port,
+        tls_cert = config.tls.cert_path,
+        tls_key = config.tls.key_path,
+        tls_auto = config.tls.auto_generate,
+        acme_enabled = config.tls.acme.enabled,
+        acme_client_path = config.tls.acme.client_path,
+        acme_directory_url = config.tls.acme.directory_url,
+        acme_webroot_path = config.tls.acme.webroot_path,
+        acme_cert_name = config.tls.acme.cert_name,
+        acme_serve_http_challenge = config.tls.acme.serve_http_challenge,
+        acme_auto_renew = config.tls.acme.auto_renew,
+        acme_renew_interval_seconds = config.tls.acme.renew_interval_seconds,
+        retention_enabled = config.retention.enabled,
+        retention_interval = config.retention.interval_seconds,
+        retention_batch = config.retention.batch_size,
+        at_rest_enabled = config.at_rest.enabled,
+        at_rest_key_env = config.at_rest.key_env,
+        at_rest_encrypt_sqlite = config.at_rest.encrypt_sqlite,
+        at_rest_encrypt_files = config.at_rest.encrypt_files,
+        at_rest_allow_plaintext = config.at_rest.allow_plaintext_file_reads,
+        backup_dir = config.backup.backup_dir,
+        backup_auto_enabled = config.backup.auto_backup_enabled,
+        backup_interval = config.backup.auto_backup_interval_seconds,
+        backup_include_media = config.backup.include_media,
+        backup_max_backups = config.backup.max_backups,
+        ai_timeout_seconds = config.ai.timeout_seconds,
+    )
+}
+
+// ── Config Loading ───────────────────────────────────────────────────────────
+
+impl Config {
+    /// Load configuration from `path`, generating a default config file if none
+    /// exists, then applying environment overrides and validating secrets.
+    ///
+    /// The returned `Config` carries a `first_run` flag (see the field docs):
+    /// it is `true` only when this call freshly generated the config file, so
+    /// callers can drive first-run onboarding without re-checking the filesystem.
+    pub fn load(path: &str) -> Result<Self> {
+        let first_run = !std::path::Path::new(path).exists();
+        let mut config = if !first_run {
+            let content = fs::read_to_string(path)?;
+            toml::from_str(&content)?
+        } else {
+            tracing::info!(
+                "Config file not found at '{}', generating defaults...",
+                path
+            );
+            let config = Config::default();
+
+            // Ensure parent directory exists
+            if let Some(parent) = std::path::Path::new(path).parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            let template = generate_config_template(&config);
+            // The template embeds freshly minted secrets (jwt_secret, LiveKit
+            // api_secret). Create the file with restrictive permissions BEFORE
+            // writing any bytes so there is no window in which another local
+            // user can read the secrets — a plain write honors the umask
+            // (typically 0644) and only chmods afterward, a TOCTOU exposure on
+            // multi-tenant hosts.
+            #[cfg(unix)]
+            {
+                use std::io::Write;
+                use std::os::unix::fs::OpenOptionsExt;
+                let mut file = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o600)
+                    .open(path)?;
+                file.write_all(template.as_bytes())?;
+            }
+            #[cfg(not(unix))]
+            {
+                fs::write(path, &template)?;
+                let _ = harden_secret_file_permissions(path);
+            }
+            tracing::info!("Generated default config at '{}'", path);
+            config
+        };
+        config.first_run = first_run;
+        let _ = harden_secret_file_permissions(path);
+
+        // Environment variable overrides
+        if let Some(value) = env_with_fallback("MERCURY_BIND_ADDRESS", "PARACORD_BIND_ADDRESS") {
+            config.server.bind_address = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_SERVER_NAME", "PARACORD_SERVER_NAME") {
+            config.server.server_name = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_PERMISSION_CACHE_MAX_ENTRIES", "PARACORD_PERMISSION_CACHE_MAX_ENTRIES") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.server.permission_cache_max_entries = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_WEB_DIR", "PARACORD_WEB_DIR") {
+            config.server.web_dir = Some(value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_PUBLIC_URL", "PARACORD_PUBLIC_URL") {
+            config.server.public_url = Some(value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_DATABASE_URL", "PARACORD_DATABASE_URL") {
+            config.database.url = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_DATABASE_ENGINE", "PARACORD_DATABASE_ENGINE") {
+            let normalized = value.trim().to_ascii_lowercase();
+            match normalized.as_str() {
+                "sqlite" => config.database.engine = DatabaseEngine::Sqlite,
+                "postgres" | "postgresql" => config.database.engine = DatabaseEngine::Postgres,
+                _ => {
+                    tracing::warn!(
+                        "Ignoring invalid MERCURY_DATABASE_ENGINE value '{}'; expected sqlite or postgres",
+                        value
+                    );
+                }
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_DATABASE_MAX_CONNECTIONS", "PARACORD_DATABASE_MAX_CONNECTIONS") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.database.max_connections = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_DATABASE_STATEMENT_TIMEOUT_SECS", "PARACORD_DATABASE_STATEMENT_TIMEOUT_SECS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.database.statement_timeout_secs = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_DATABASE_IDLE_IN_TRANSACTION_TIMEOUT_SECS", "PARACORD_DATABASE_IDLE_IN_TRANSACTION_TIMEOUT_SECS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.database.idle_in_transaction_timeout_secs = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_DATABASE_WORK_MEM_MB", "PARACORD_DATABASE_WORK_MEM_MB") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.database.work_mem_mb = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_DATABASE_MAINTENANCE_WORK_MEM_MB", "PARACORD_DATABASE_MAINTENANCE_WORK_MEM_MB") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.database.maintenance_work_mem_mb = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_JWT_SECRET", "PARACORD_JWT_SECRET") {
+            config.auth.jwt_secret = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_JWT_EXPIRY_SECONDS", "PARACORD_JWT_EXPIRY_SECONDS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.auth.jwt_expiry_seconds = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_REGISTRATION_ENABLED", "PARACORD_REGISTRATION_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.auth.registration_enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AUTH_ALLOW_USERNAME_LOGIN", "PARACORD_AUTH_ALLOW_USERNAME_LOGIN") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.auth.allow_username_login = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AUTH_REQUIRE_EMAIL", "PARACORD_AUTH_REQUIRE_EMAIL") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.auth.require_email = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AUTH_REQUIRE_EMAIL_VERIFICATION", "PARACORD_AUTH_REQUIRE_EMAIL_VERIFICATION") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.auth.require_email_verification = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_STORAGE_TYPE", "PARACORD_STORAGE_TYPE") {
+            config.storage.storage_type = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_STORAGE_PATH", "PARACORD_STORAGE_PATH") {
+            config.storage.path = value;
+        }
+        // S3 environment overrides
+        if let Some(value) = env_with_fallback("MERCURY_S3_BUCKET", "PARACORD_S3_BUCKET") {
+            config.s3.bucket = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_REGION", "PARACORD_S3_REGION") {
+            config.s3.region = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_ENDPOINT_URL", "PARACORD_S3_ENDPOINT_URL") {
+            config.s3.endpoint_url = Some(value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_ACCESS_KEY_ID", "PARACORD_S3_ACCESS_KEY_ID") {
+            config.s3.access_key_id = Some(value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_SECRET_ACCESS_KEY", "PARACORD_S3_SECRET_ACCESS_KEY") {
+            config.s3.secret_access_key = Some(value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_USE_AWS_CREDENTIAL_CHAIN", "PARACORD_S3_USE_AWS_CREDENTIAL_CHAIN") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.s3.use_aws_credential_chain = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_PREFIX", "PARACORD_S3_PREFIX") {
+            config.s3.prefix = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_CDN_URL", "PARACORD_S3_CDN_URL") {
+            config.s3.cdn_url = Some(value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_S3_FORCE_PATH_STYLE", "PARACORD_S3_FORCE_PATH_STYLE") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.s3.force_path_style = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_MEDIA_STORAGE_PATH", "PARACORD_MEDIA_STORAGE_PATH") {
+            config.media.storage_path = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_VOICE_NATIVE_MEDIA", "PARACORD_VOICE_NATIVE_MEDIA") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.voice.native_media = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_VOICE_PORT", "PARACORD_VOICE_PORT") {
+            if let Ok(parsed) = value.parse::<u16>() {
+                config.voice.port = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_VOICE_MAX_PARTICIPANTS_PER_ROOM", "PARACORD_VOICE_MAX_PARTICIPANTS_PER_ROOM") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.voice.max_participants_per_room = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_VOICE_AUDIO_BITRATE", "PARACORD_VOICE_AUDIO_BITRATE") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.voice.audio_bitrate = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_VOICE_E2EE_REQUIRED", "PARACORD_VOICE_E2EE_REQUIRED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.voice.e2ee_required = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_LIVEKIT_URL", "PARACORD_LIVEKIT_URL") {
+            config.livekit.url = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_LIVEKIT_HTTP_URL", "PARACORD_LIVEKIT_HTTP_URL") {
+            config.livekit.http_url = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_LIVEKIT_API_KEY", "PARACORD_LIVEKIT_API_KEY") {
+            config.livekit.api_key = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_LIVEKIT_API_SECRET", "PARACORD_LIVEKIT_API_SECRET") {
+            config.livekit.api_secret = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_LIVEKIT_PUBLIC_URL", "PARACORD_LIVEKIT_PUBLIC_URL") {
+            config.livekit.public_url = Some(value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_WINDOWS_FIREWALL_AUTO_ALLOW", "PARACORD_WINDOWS_FIREWALL_AUTO_ALLOW") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.network.windows_firewall_auto_allow = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AUTO_PORT_FORWARD", "PARACORD_AUTO_PORT_FORWARD") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.network.auto_port_forward = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_PORT_FORWARD_LEASE_SECONDS", "PARACORD_PORT_FORWARD_LEASE_SECONDS") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.network.port_forward_lease_seconds = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ENABLED", "PARACORD_TLS_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.tls.enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_ENABLED", "PARACORD_TLS_ACME_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.tls.acme.enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_CLIENT_PATH", "PARACORD_TLS_ACME_CLIENT_PATH") {
+            if !value.trim().is_empty() {
+                config.tls.acme.client_path = value;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_DIRECTORY_URL", "PARACORD_TLS_ACME_DIRECTORY_URL") {
+            if !value.trim().is_empty() {
+                config.tls.acme.directory_url = value;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_EMAIL", "PARACORD_TLS_ACME_EMAIL") {
+            config.tls.acme.email = if value.trim().is_empty() {
+                None
+            } else {
+                Some(value)
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_DOMAINS", "PARACORD_TLS_ACME_DOMAINS") {
+            config.tls.acme.domains = value
+                .split(',')
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+                .map(str::to_string)
+                .collect();
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_WEBROOT_PATH", "PARACORD_TLS_ACME_WEBROOT_PATH") {
+            if !value.trim().is_empty() {
+                config.tls.acme.webroot_path = value;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_CERT_NAME", "PARACORD_TLS_ACME_CERT_NAME") {
+            if !value.trim().is_empty() {
+                config.tls.acme.cert_name = value;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_CERT_SOURCE_PATH", "PARACORD_TLS_ACME_CERT_SOURCE_PATH") {
+            config.tls.acme.cert_source_path = if value.trim().is_empty() {
+                None
+            } else {
+                Some(value)
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_KEY_SOURCE_PATH", "PARACORD_TLS_ACME_KEY_SOURCE_PATH") {
+            config.tls.acme.key_source_path = if value.trim().is_empty() {
+                None
+            } else {
+                Some(value)
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_SERVE_HTTP_CHALLENGE", "PARACORD_TLS_ACME_SERVE_HTTP_CHALLENGE") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.tls.acme.serve_http_challenge = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_AUTO_RENEW", "PARACORD_TLS_ACME_AUTO_RENEW") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.tls.acme.auto_renew = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_RENEW_INTERVAL_SECONDS", "PARACORD_TLS_ACME_RENEW_INTERVAL_SECONDS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.tls.acme.renew_interval_seconds = parsed.max(300);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_TLS_ACME_ADDITIONAL_ARGS", "PARACORD_TLS_ACME_ADDITIONAL_ARGS") {
+            config.tls.acme.additional_args = value
+                .split(',')
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+                .map(str::to_string)
+                .collect();
+        }
+        if let Some(value) = env_with_fallback("MERCURY_SETUP_REQUIRE_CLAIM", "PARACORD_SETUP_REQUIRE_CLAIM") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.setup.require_claim = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_SETUP_CLAIM_TOKEN", "PARACORD_SETUP_CLAIM_TOKEN") {
+            let trimmed = value.trim();
+            config.setup.claim_token = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_ENABLED", "PARACORD_FEDERATION_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.federation.enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_DOMAIN", "PARACORD_FEDERATION_DOMAIN") {
+            if !value.trim().is_empty() {
+                config.federation.domain = Some(value);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_SIGNING_KEY_PATH", "PARACORD_FEDERATION_SIGNING_KEY_PATH") {
+            let trimmed = value.trim();
+            config.federation.signing_key_path = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_ALLOW_DISCOVERY", "PARACORD_FEDERATION_ALLOW_DISCOVERY") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.federation.allow_discovery = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_MAX_EVENTS_PER_PEER_PER_MINUTE", "PARACORD_FEDERATION_MAX_EVENTS_PER_PEER_PER_MINUTE") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.federation.max_events_per_peer_per_minute = Some(parsed);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_MAX_USER_CREATES_PER_PEER_PER_HOUR", "PARACORD_FEDERATION_MAX_USER_CREATES_PER_PEER_PER_HOUR") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.federation.max_user_creates_per_peer_per_hour = Some(parsed);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_MAX_GUILD_STORAGE_QUOTA", "PARACORD_MAX_GUILD_STORAGE_QUOTA") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.storage.max_guild_storage_quota = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_FILE_CACHE_ENABLED", "PARACORD_FEDERATION_FILE_CACHE_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.federation.file_cache_enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_FILE_CACHE_MAX_SIZE", "PARACORD_FEDERATION_FILE_CACHE_MAX_SIZE") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.federation.file_cache_max_size = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_FEDERATION_FILE_CACHE_TTL_HOURS", "PARACORD_FEDERATION_FILE_CACHE_TTL_HOURS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.federation.file_cache_ttl_hours = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_ENABLED", "PARACORD_RETENTION_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.retention.enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_INTERVAL_SECONDS", "PARACORD_RETENTION_INTERVAL_SECONDS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.retention.interval_seconds = parsed.max(60);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_BATCH_SIZE", "PARACORD_RETENTION_BATCH_SIZE") {
+            if let Ok(parsed) = value.parse::<i64>() {
+                config.retention.batch_size = parsed.clamp(1, 10_000);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_MESSAGE_DAYS", "PARACORD_RETENTION_MESSAGE_DAYS") {
+            config.retention.message_days = parse_optional_days(&value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_ATTACHMENT_DAYS", "PARACORD_RETENTION_ATTACHMENT_DAYS") {
+            config.retention.attachment_days = parse_optional_days(&value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_AUDIT_LOG_DAYS", "PARACORD_RETENTION_AUDIT_LOG_DAYS") {
+            config.retention.audit_log_days = parse_optional_days(&value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_SECURITY_EVENT_DAYS", "PARACORD_RETENTION_SECURITY_EVENT_DAYS") {
+            config.retention.security_event_days = parse_optional_days(&value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_RETENTION_SESSION_DAYS", "PARACORD_RETENTION_SESSION_DAYS") {
+            config.retention.session_days = parse_optional_days(&value);
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AT_REST_ENABLED", "PARACORD_AT_REST_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.at_rest.enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AT_REST_KEY_ENV", "PARACORD_AT_REST_KEY_ENV") {
+            if !value.trim().is_empty() {
+                config.at_rest.key_env = value;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AT_REST_ENCRYPT_SQLITE", "PARACORD_AT_REST_ENCRYPT_SQLITE") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.at_rest.encrypt_sqlite = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AT_REST_ENCRYPT_FILES", "PARACORD_AT_REST_ENCRYPT_FILES") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.at_rest.encrypt_files = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AT_REST_ALLOW_PLAINTEXT_FILE_READS", "PARACORD_AT_REST_ALLOW_PLAINTEXT_FILE_READS") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.at_rest.allow_plaintext_file_reads = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_BACKUP_DIR", "PARACORD_BACKUP_DIR") {
+            config.backup.backup_dir = value;
+        }
+        if let Some(value) = env_with_fallback("MERCURY_BACKUP_AUTO_ENABLED", "PARACORD_BACKUP_AUTO_ENABLED") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.backup.auto_backup_enabled = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_BACKUP_INTERVAL_SECONDS", "PARACORD_BACKUP_INTERVAL_SECONDS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.backup.auto_backup_interval_seconds = parsed.max(3600);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_BACKUP_INCLUDE_MEDIA", "PARACORD_BACKUP_INCLUDE_MEDIA") {
+            if let Ok(parsed) = value.parse::<bool>() {
+                config.backup.include_media = parsed;
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_BACKUP_MAX_BACKUPS", "PARACORD_BACKUP_MAX_BACKUPS") {
+            if let Ok(parsed) = value.parse::<u32>() {
+                config.backup.max_backups = parsed.clamp(1, 100);
+            }
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AI_PROVIDER", "PARACORD_AI_PROVIDER") {
+            let trimmed = value.trim().to_string();
+            config.ai.provider = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AI_BASE_URL", "PARACORD_AI_BASE_URL") {
+            let trimmed = value.trim().to_string();
+            config.ai.base_url = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AI_API_KEY", "PARACORD_AI_API_KEY") {
+            let trimmed = value.trim().to_string();
+            config.ai.api_key = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AI_MODEL", "PARACORD_AI_MODEL") {
+            let trimmed = value.trim().to_string();
+            config.ai.model = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
+        }
+        if let Some(value) = env_with_fallback("MERCURY_AI_TIMEOUT_SECONDS", "PARACORD_AI_TIMEOUT_SECONDS") {
+            if let Ok(parsed) = value.parse::<u64>() {
+                config.ai.timeout_seconds = parsed.clamp(5, 120);
+            }
+        }
+
+        if let Some(value) = env_with_fallback("MERCURY_SPORTS_REPLAY", "PARACORD_SPORTS_REPLAY") {
+            let spec = value.trim();
+            if !spec.is_empty() {
+                let games = mercury_core::sports::parse_replay_games(spec);
+                if games.is_empty() {
+                    tracing::warn!(
+                        "PARACORD_SPORTS_REPLAY is set but has no valid games; sports replay is off."
+                    );
+                } else {
+                    let speed = match env_with_fallback("MERCURY_SPORTS_REPLAY_SPEED", "PARACORD_SPORTS_REPLAY_SPEED") {
+                        Some(raw) => match raw.trim().parse::<f64>() {
+                            Ok(speed) if speed.is_finite() && speed > 0.0 => speed,
+                            _ => {
+                                tracing::warn!(
+                                    "PARACORD_SPORTS_REPLAY_SPEED must be a positive number; using 6."
+                                );
+                                6.0
+                            }
+                        },
+                        None => 6.0,
+                    };
+                    let start = match env_with_fallback("MERCURY_SPORTS_REPLAY_START", "PARACORD_SPORTS_REPLAY_START") {
+                        Some(raw) if !raw.trim().is_empty() => {
+                            match mercury_core::sports::parse_replay_start(&raw) {
+                                Some(start) => Some(start),
+                                None => {
+                                    tracing::warn!(
+                                        "PARACORD_SPORTS_REPLAY_START must be an RFC3339 time; starting at the first play."
+                                    );
+                                    None
+                                }
+                            }
+                        }
+                        _ => None,
+                    };
+                    config.sports_replay = Some(SportsReplaySettings {
+                        games,
+                        speed,
+                        start,
+                    });
+                }
+            }
+        }
+
+        if let Some(value) = env_with_fallback("MERCURY_TENOR_API_KEY", "PARACORD_TENOR_API_KEY") {
+            let trimmed = value.trim().to_string();
+            config.integrations.tenor_api_key = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
+        }
+
+        validate_secret_configuration(&config)?;
+        Ok(config)
+    }
+}
+
+/// True when the server is configured for a public deployment (non-local dev).
+pub fn is_production_deployment(config: &Config) -> bool {
+    config
+        .server
+        .public_url
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|url| !url.is_empty())
+}
+
+fn parse_optional_days(raw: &str) -> Option<i64> {
+    raw.parse::<i64>()
+        .ok()
+        .and_then(|days| if days > 0 { Some(days.min(3650)) } else { None })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        generate_config_template, looks_like_placeholder_secret, validate_secret_configuration,
+        Config, DatabaseConfig, DatabaseEngine, TlsConfig,
+    };
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn voice_defaults_to_native_media() {
+        assert!(Config::default().voice.native_media);
+    }
+
+    #[test]
+    fn generated_config_template_round_trips_with_native_media_enabled() {
+        let template = generate_config_template(&Config::default());
+        let parsed: Config = toml::from_str(&template).expect("template must round-trip");
+        assert!(parsed.voice.native_media);
+        // first_run is not persisted; a parsed config is never a first run.
+        assert!(!parsed.first_run);
+    }
+
+    #[test]
+    fn validate_secret_ok_with_native_default_and_blank_livekit() {
+        let mut config = Config::default();
+        assert!(config.voice.native_media);
+        config.livekit.api_key = String::new();
+        config.livekit.api_secret = "   ".to_string();
+        assert!(validate_secret_configuration(&config).is_ok());
+    }
+
+    #[test]
+    fn validate_secret_errors_when_native_disabled_and_livekit_placeholder() {
+        let mut config = Config::default();
+        config.voice.native_media = false;
+        config.livekit.api_key = "change_me".to_string();
+        config.livekit.api_secret = String::new();
+        assert!(validate_secret_configuration(&config).is_err());
+    }
+
+    #[test]
+    fn validate_secret_errors_when_livekit_uses_shipped_default_secret() {
+        // The docker-compose default secret is 33 chars and matches no legacy
+        // placeholder token, yet must be rejected for a LiveKit-only operator.
+        let mut config = Config::default();
+        config.voice.native_media = false;
+        config.livekit.api_key = "paracordlocal".to_string();
+        config.livekit.api_secret = "paracord-local-dev-livekit-secret".to_string();
+        assert!(validate_secret_configuration(&config).is_err());
+    }
+
+    #[test]
+    fn validate_secret_errors_when_livekit_uses_shipped_dev_api_secret() {
+        // The previously-shipped LiveKit dev secret is 36 chars and matches no
+        // other placeholder token, yet must be rejected for a LiveKit operator.
+        let mut config = Config::default();
+        config.voice.native_media = false;
+        config.livekit.api_key = "devkey_livekit".to_string();
+        config.livekit.api_secret = "mercury_secret_key_at_least_32chars!".to_string();
+        assert!(validate_secret_configuration(&config).is_err());
+        // Also rejected outright by the placeholder detector.
+        assert!(looks_like_placeholder_secret(
+            "mercury_secret_key_at_least_32chars!"
+        ));
+    }
+
+    #[test]
+    fn validate_secret_errors_on_weak_jwt_regardless_of_media() {
+        // Short JWT with native media on (LiveKit check skipped) still fails.
+        let mut native = Config::default();
+        native.auth.jwt_secret = "short".to_string();
+        assert!(validate_secret_configuration(&native).is_err());
+
+        // Blank JWT with native media off also fails.
+        let mut livekit_only = Config::default();
+        livekit_only.voice.native_media = false;
+        livekit_only.auth.jwt_secret = String::new();
+        assert!(validate_secret_configuration(&livekit_only).is_err());
+    }
+
+    #[test]
+    fn validate_secret_rejects_legacy_public_jwt_secret() {
+        let mut config = Config::default();
+        config.auth.jwt_secret =
+            "mercury_dev_secret_key_change_in_production_1234567890abcdef".to_string();
+        assert!(validate_secret_configuration(&config).is_err());
+    }
+
+    #[test]
+    fn tls_defaults_enable_self_signed_bootstrap() {
+        let tls = TlsConfig::default();
+        assert!(tls.enabled);
+        assert!(tls.auto_generate);
+    }
+
+    #[test]
+    fn database_defaults_to_sqlite_engine() {
+        let db = DatabaseConfig::default();
+        assert_eq!(db.engine, DatabaseEngine::Sqlite);
+    }
+
+    #[test]
+    fn storage_defaults_to_local_without_aws_credential_chain() {
+        let config = Config::default();
+
+        assert_eq!(config.storage.storage_type, "local");
+        assert!(config.s3.access_key_id.is_none());
+        assert!(config.s3.secret_access_key.is_none());
+        assert!(!config.s3.use_aws_credential_chain);
+    }
+
+    #[test]
+    fn env_override_accepts_postgres_engine() {
+        let _guard = ENV_LOCK.lock().expect("env lock poisoned");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("paracord-test.toml");
+        std::env::set_var("PARACORD_JWT_SECRET", "0123456789abcdef0123456789abcdef");
+        std::env::set_var("PARACORD_DATABASE_ENGINE", "postgres");
+        let config =
+            Config::load(config_path.to_str().expect("config path utf8")).expect("load config");
+        std::env::remove_var("PARACORD_DATABASE_ENGINE");
+        std::env::remove_var("PARACORD_JWT_SECRET");
+        assert_eq!(config.database.engine, DatabaseEngine::Postgres);
+    }
+
+    #[test]
+    fn s3_environment_does_not_select_s3_storage_without_explicit_type() {
+        let _guard = ENV_LOCK.lock().expect("env lock poisoned");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("paracord-test.toml");
+
+        std::env::remove_var("PARACORD_STORAGE_TYPE");
+        std::env::set_var("PARACORD_JWT_SECRET", "0123456789abcdef0123456789abcdef");
+        std::env::set_var("PARACORD_S3_BUCKET", "paracord-test");
+        std::env::set_var("PARACORD_S3_ACCESS_KEY_ID", "test-key");
+        std::env::set_var("PARACORD_S3_SECRET_ACCESS_KEY", "test-secret");
+        std::env::set_var("PARACORD_S3_USE_AWS_CREDENTIAL_CHAIN", "true");
+
+        let config =
+            Config::load(config_path.to_str().expect("config path utf8")).expect("load config");
+
+        std::env::remove_var("PARACORD_JWT_SECRET");
+        std::env::remove_var("PARACORD_S3_BUCKET");
+        std::env::remove_var("PARACORD_S3_ACCESS_KEY_ID");
+        std::env::remove_var("PARACORD_S3_SECRET_ACCESS_KEY");
+        std::env::remove_var("PARACORD_S3_USE_AWS_CREDENTIAL_CHAIN");
+
+        assert_eq!(config.storage.storage_type, "local");
+        assert_eq!(config.s3.bucket, "paracord-test");
+        assert!(config.s3.use_aws_credential_chain);
+    }
+
+    /// Asking the router to let friends in is the default, because the whole
+    /// point is that a first-time owner never has to find their router's
+    /// settings page. Anything else would leave the hardest step un-automated.
+    #[test]
+    fn asking_the_router_is_on_by_default() {
+        let config = Config::default();
+        assert!(config.network.auto_port_forward);
+        assert_eq!(config.network.port_forward_lease_seconds, 3600);
+    }
+
+    /// The generated config file both documents the option and round-trips it,
+    /// so an owner who edits the file gets what the comment promised.
+    #[test]
+    fn generated_config_documents_and_round_trips_auto_port_forward() {
+        let template = generate_config_template(&Config::default());
+        assert!(
+            template.contains("auto_port_forward = true"),
+            "generated config must set the option explicitly:\n{template}"
+        );
+        assert!(
+            template.contains("PARACORD_AUTO_PORT_FORWARD"),
+            "generated config must name the env override:\n{template}"
+        );
+        assert!(
+            template.contains("port_forward_lease_seconds = 3600"),
+            "generated config must set the lease:\n{template}"
+        );
+        let parsed: Config = toml::from_str(&template).expect("template must round-trip");
+        assert!(parsed.network.auto_port_forward);
+        assert_eq!(parsed.network.port_forward_lease_seconds, 3600);
+    }
+
+    /// An operator who does not want the server touching their router turns it
+    /// off from the environment, the same way every other switch in this file
+    /// can be turned off.
+    #[test]
+    fn env_override_turns_the_router_request_off_and_back_on() {
+        let _guard = ENV_LOCK.lock().expect("env lock poisoned");
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("PARACORD_JWT_SECRET", "0123456789abcdef0123456789abcdef");
+
+        std::env::set_var("PARACORD_AUTO_PORT_FORWARD", "false");
+        std::env::set_var("PARACORD_PORT_FORWARD_LEASE_SECONDS", "900");
+        let off_path = temp.path().join("off.toml");
+        let off = Config::load(off_path.to_str().expect("config path utf8")).expect("load config");
+        assert!(!off.network.auto_port_forward);
+        assert_eq!(off.network.port_forward_lease_seconds, 900);
+
+        std::env::set_var("PARACORD_AUTO_PORT_FORWARD", "true");
+        std::env::remove_var("PARACORD_PORT_FORWARD_LEASE_SECONDS");
+        let on_path = temp.path().join("on.toml");
+        let on = Config::load(on_path.to_str().expect("config path utf8")).expect("load config");
+        assert!(on.network.auto_port_forward);
+        assert_eq!(on.network.port_forward_lease_seconds, 3600);
+
+        // A value that is not a boolean must leave the default alone rather
+        // than silently disabling the feature.
+        std::env::set_var("PARACORD_AUTO_PORT_FORWARD", "maybe");
+        let junk_path = temp.path().join("junk.toml");
+        let junk =
+            Config::load(junk_path.to_str().expect("config path utf8")).expect("load config");
+        assert!(junk.network.auto_port_forward);
+
+        std::env::remove_var("PARACORD_AUTO_PORT_FORWARD");
+        std::env::remove_var("PARACORD_JWT_SECRET");
+    }
+}

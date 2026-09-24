@@ -290,7 +290,7 @@ Found and removed inside WP7's scope:
   bg-bg-tertiary` readout pattern, used ~15 times in user settings alone, is now
   a well.
 - **Placeholder microcopy** — "Nothing detected yet" for the activity-privacy
-  list became "Paracord hasn't seen you in another app yet", with the same
+  list became "Archlast Mercury hasn't seen you in another app yet", with the same
   follow-on line telling you how to make something appear.
 - **Status dots** — server connect drew three presence dots (`accent-success` /
   `accent-warning` / `text-faint`) beside each saved server. §1.5 and §6.6 say
@@ -347,12 +347,12 @@ Run from `client/`.
 ### Screenshots
 
 ```bash
-PARACORD_E2E_DESIGN=1 PARACORD_E2E_DESIGN_WP=wp7 npx playwright test
+MERCURY_E2E_DESIGN=1 MERCURY_E2E_DESIGN_WP=wp7 npx playwright test
 # → output/design-reference/wp7/ (gitignored)
 ```
 
 `client/e2e/design-review.spec.ts` gained a WP7 pass that runs only when
-`PARACORD_E2E_DESIGN_WP=wp7`. It captures, at **1440×900 and 390×844**:
+`MERCURY_E2E_DESIGN_WP=wp7`. It captures, at **1440×900 and 390×844**:
 
 - every user-settings section (account, appearance, voice, notifications,
   activity, keybinds, identity, server, about),

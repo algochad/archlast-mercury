@@ -1,21 +1,21 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/paracord-server",
-    "crates/paracord-api",
-    "crates/paracord-ws",
-    "crates/paracord-core",
-    "crates/paracord-db",
-    "crates/paracord-federation",
-    "crates/paracord-models",
-    "crates/paracord-contracts",
-    "crates/paracord-media",
-    "crates/paracord-util",
+    "crates/mercury-server",
+    "crates/mercury-api",
+    "crates/mercury-ws",
+    "crates/mercury-core",
+    "crates/mercury-db",
+    "crates/mercury-federation",
+    "crates/mercury-models",
+    "crates/mercury-contracts",
+    "crates/mercury-media",
+    "crates/mercury-util",
     # Custom media server crates
-    "crates/paracord-transport",
-    "crates/paracord-relay",
-    "crates/paracord-codec",
-    "crates/paracord-media-dev",
+    "crates/mercury-transport",
+    "crates/mercury-relay",
+    "crates/mercury-codec",
+    "crates/mercury-media-dev",
     "client/src-tauri",
 ]
 
@@ -26,7 +26,7 @@ rust-version = "1.88"
 license-file = "LICENSE"
 
 [workspace.dependencies]
-paracord-contracts = { path = "crates/paracord-contracts" }
+mercury-contracts = { path = "crates/mercury-contracts" }
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
@@ -136,24 +136,24 @@ audiopus = "0.3.0-rc.0"
 nnnoiseless = { version = "0.5", default-features = false }
 cpal = "0.15"
 rubato = "0.15"
-# In-process libavcodec FFI (feature-gated `lavc` in paracord-codec). Version
+# In-process libavcodec FFI (feature-gated `lavc` in mercury-codec). Version
 # tracks the system FFmpeg ABI (8.1). Bindings are regenerated from the
 # installed headers via bindgen 0.72, which is libclang >= 19 safe (older
 # bindgen emits opaque structs — see the env-libvpx-sys note above).
 ffmpeg-sys-next = "8.1.0"
 
 # Workspace crates
-paracord-api = { path = "crates/paracord-api" }
-paracord-ws = { path = "crates/paracord-ws" }
-paracord-core = { path = "crates/paracord-core" }
-paracord-db = { path = "crates/paracord-db" }
-paracord-federation = { path = "crates/paracord-federation" }
-paracord-models = { path = "crates/paracord-models" }
-paracord-media = { path = "crates/paracord-media" }
-paracord-util = { path = "crates/paracord-util" }
-paracord-transport = { path = "crates/paracord-transport" }
-paracord-relay = { path = "crates/paracord-relay" }
-paracord-codec = { path = "crates/paracord-codec" }
+mercury-api = { path = "crates/mercury-api" }
+mercury-ws = { path = "crates/mercury-ws" }
+mercury-core = { path = "crates/mercury-core" }
+mercury-db = { path = "crates/mercury-db" }
+mercury-federation = { path = "crates/mercury-federation" }
+mercury-models = { path = "crates/mercury-models" }
+mercury-media = { path = "crates/mercury-media" }
+mercury-util = { path = "crates/mercury-util" }
+mercury-transport = { path = "crates/mercury-transport" }
+mercury-relay = { path = "crates/mercury-relay" }
+mercury-codec = { path = "crates/mercury-codec" }
 
 # Real-time media (pixel conversion, VP9 encode, datagram fan-out) is unusably
 # slow at opt-level 0 — seconds per frame at screen resolutions. Keep debug
@@ -165,16 +165,16 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.dev.package.paracord-codec]
+[profile.dev.package.mercury-codec]
 opt-level = 3
 
-[profile.dev.package.paracord-transport]
+[profile.dev.package.mercury-transport]
 opt-level = 3
 
-[profile.dev.package.paracord-relay]
+[profile.dev.package.mercury-relay]
 opt-level = 3
 
-[profile.dev.package.paracord-desktop]
+[profile.dev.package.mercury-desktop]
 opt-level = 2
 
 [patch.crates-io]

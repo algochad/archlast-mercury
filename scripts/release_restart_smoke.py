@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release-binary restart persistence smoke test.
 
-Starts `target/release/paracord-server`, creates durable app state, stops the
+Starts `target/release/mercury-server`, creates durable app state, stops the
 server, restarts against the same temp SQLite database, and verifies auth plus
 message state still works through real HTTP requests.
 """

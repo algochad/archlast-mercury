@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/brand/paracord.webp" alt="The Paracord mark: a lantern on a braided cord handle lights up above the name Paracord" width="520"/>
+  <img src="docs/images/brand/mercury.webp" alt="The Archlast Mercury mark: a lantern on a braided cord handle lights up above the name Archlast Mercury" width="520"/>
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/Scdouglas1999/Paracord?label=release&color=2bb39a" alt="Latest release"/></a>
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/algochad/archlast-mercury?label=release&color=2bb39a" alt="Latest release"/></a>
   <img src="https://img.shields.io/badge/desktop-Windows%20%7C%20Linux%20%7C%20macOS-1b232b" alt="Desktop app for Windows, Linux and macOS"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-source--available-2f3b46" alt="Source-available license"/></a>
 </p>
@@ -31,18 +31,18 @@
 
 ![Basecamp's front page: a banner of mountains at dusk, the server's name, eight people online, a Live now row with two voice channels and a baseball game, a column of upcoming events and recent photos, and a feed of what people shared.](docs/images/readme/server.jpg)
 
-Paracord works about how you'd expect from Discord: servers, text and voice channels,
+Archlast Mercury works about how you'd expect from Discord: servers, text and voice channels,
 direct messages, roles, moderation. The difference is that there's no company in the
-middle. Somebody in your group runs the Paracord server on a computer that stays on, and
+middle. Somebody in your group runs the Archlast Mercury server on a computer that stays on, and
 everyone else joins with a link.
 
-Setting that up is one command. It downloads Paracord, sets it to start by itself, asks
+Setting that up is one command. It downloads Archlast Mercury, sets it to start by itself, asks
 your router to let people in, and opens a link in your browser where you make your account
 and name your server. Friends open an invite link in any browser, or install the desktop
 app for Windows, Linux or macOS.
 
 Direct messages and group messages are encrypted end to end. Voice and video run on
-Paracord's own code, so there's no third-party media service to sign up for.
+Archlast Mercury's own code, so there's no third-party media service to sign up for.
 
 It suits a group that has somebody willing to keep a machine on and read a docs page when
 something breaks. Nobody is hosting this for you, and it's a young project, so the
@@ -68,13 +68,13 @@ One command, then one link.
 **Linux or macOS**, in a terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.sh | sh
 ```
 
 **Windows**, in any PowerShell window (it asks for administrator permission itself):
 
 ```powershell
-irm https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.ps1 | iex
 ```
 
 **1. Finish setting up.** The installer opens a link in your browser, and prints it as well.
@@ -96,18 +96,18 @@ say yes. If yours refuses, the Invite dialog and the server's startup message bo
 and [Friends outside your network](docs/port-forwarding.md) walks through the one router
 setting to change.
 
-Running the same command again later updates Paracord and keeps all your data.
+Running the same command again later updates Archlast Mercury and keeps all your data.
 
 <details>
 <summary>What the installer does, if you want to know before you run it</summary>
 
-On Linux with `sudo` it installs under `/opt/paracord`, creates a `paracord` service user
+On Linux with `sudo` it installs under `/opt/archlast-mercury`, creates a `mercury` service user
 and an auto-restarting systemd unit. Without root it installs under
-`~/.local/share/paracord` with a per-user service. On macOS it installs a launchd job. On
-Windows with administrator permission it installs under `%ProgramFiles%\Paracord`,
+`~/.local/share/archlast-mercury` with a per-user service. On macOS it installs a launchd job. On
+Windows with administrator permission it installs under `%ProgramFiles%\Archlast Mercury`,
 registers an auto-start task running as `SYSTEM`, and opens the firewall for the app and
-voice ports; without it, it installs just for you under `%LOCALAPPDATA%\Paracord`.
-Upgrades keep your config and data and back up the old binary. `PARACORD_NO_BROWSER=1`
+voice ports; without it, it installs just for you under `%LOCALAPPDATA%\Archlast Mercury`.
+Upgrades keep your config and data and back up the old binary. `MERCURY_NO_BROWSER=1` (deprecated alias `PARACORD_*` still works)
 prints the setup link instead of opening it, and the header of `scripts/install.sh` lists
 the other overrides. The server maps its ports on the router with UPnP or NAT-PMP; turn
 that off with `auto_port_forward = false` under `[network]`.
@@ -119,19 +119,19 @@ release pipeline does not publish checksums yet, and the installer says so while
 
 ### Manual download
 
-Take `paracord-server-linux-x64-*.tar.gz`, `paracord-server-windows-x64-*.zip` or
-`paracord-server-macos-*.tar.gz` from [Releases](../../releases/latest), extract it, and
+Take `mercury-server-linux-x64-*.tar.gz`, `mercury-server-windows-x64-*.zip` or
+`mercury-server-macos-*.tar.gz` from [Releases](../../releases/latest), extract it, and
 run it:
 
 ```bash
 # Linux and macOS
-./paracord-server init   # optional: write the config and print what to do next
-./paracord-server
+./mercury-server init   # optional: write the config and print what to do next
+./mercury-server
 ```
 
 ```powershell
 # Windows
-.\paracord-server.exe
+.\mercury-server.exe
 ```
 
 First run creates its settings file, its database and its own certificate, then prints the
@@ -141,13 +141,13 @@ one-time link that finishes setup. The same link is saved next to the config as
 ### Docker Compose
 
 ```bash
-curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/docker-compose.yml
-PARACORD_PULL_POLICY=missing docker compose up -d
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/algochad/archlast-mercury/main/docker-compose.yml
+MERCURY_PULL_POLICY=missing docker compose up -d
 ```
 
-That pulls the image CI publishes to GHCR. Leave `PARACORD_PULL_POLICY` off to build the
-image locally instead, or point `PARACORD_BUILD_CONTEXT` at
-`https://github.com/Scdouglas1999/Paracord.git#main` to build from the remote repository
+That pulls the image CI publishes to GHCR. Leave `MERCURY_PULL_POLICY` off to build the
+image locally instead, or point `MERCURY_BUILD_CONTEXT` at
+`https://github.com/algochad/archlast-mercury.git#main` to build from the remote repository
 without cloning it. No `.env` file is needed.
 
 The stack publishes the app on `127.0.0.1:8090` and voice on UDP `8443`, and expects a
@@ -184,7 +184,7 @@ filters as you go. Results are grouped by channel, and Enter jumps to the messag
 | | |
 | :--- | :--- |
 | ![Hovering a reaction on a mountain photo shows a small card listing the three people who reacted.](docs/images/readme/reactions.jpg) | ![The server's Media panel: photos from every channel, grouped by month, beside the server's front page.](docs/images/readme/media.jpg) |
-| See who reacted, and have Paracord remind you about a message later. | Every photo, file and link a server has shared, in one place. |
+| See who reacted, and have Archlast Mercury remind you about a message later. | Every photo, file and link a server has shared, in one place. |
 
 It's built for phones too.
 
@@ -205,7 +205,7 @@ unread counts and per-channel notification settings.
 and a feed of what people shared. Owners choose which panels show and in what order.
 
 **Voice, video and screen sharing.** Voice channels, video grids, screen sharing and device
-controls, over Paracord's own QUIC transport: raw QUIC in the desktop app, WebTransport in
+controls, over Archlast Mercury's own QUIC transport: raw QUIC in the desktop app, WebTransport in
 the browser. Opus audio with RNNoise noise suppression, VP9 video, speaker detection, and
 media frames the relay cannot read.
 
@@ -235,8 +235,8 @@ happens. The server fetches scores from ESPN's public scoreboard, so your member
 never talk to ESPN. See [Sports](docs/sports.md).
 
 **Bots and other servers.** Bot applications with slash commands and interaction components,
-webhooks, and a [bot SDK](packages/paracord-bot-sdk). One client can connect to several
-Paracord servers and move between them. Servers can also be linked to each other with signed
+webhooks, and a [bot SDK](packages/archlast-mercury-bot-sdk). One client can connect to several
+Archlast Mercury servers and move between them. Servers can also be linked to each other with signed
 server-to-server requests, which is off by default and is a trust decision rather than a
 switch to flip, so read [Federation Protocol](docs/federation-protocol.md) first.
 
@@ -282,7 +282,7 @@ lives in [known limitations](docs/known-limitations.md) and in the release notes
   turns off WebKit's GPU compositing at startup, because WebKitGTK crashes against that
   driver and the window never paints. Video still decodes on the GPU; only the interface is
   affected. The AppImage is a separate problem and is still broken there, so install the
-  `.deb` or build from source. `PARACORD_WEBKIT_ACCELERATION=ondemand` overrides the choice
+  `.deb` or build from source. `MERCURY_WEBKIT_ACCELERATION=ondemand` overrides the choice
   if your driver has since been fixed.
 - The Windows installer has been checked by tools but not run by hand on a Windows
   machine. If it misbehaves, download `install.ps1` and run it
@@ -315,7 +315,7 @@ public HTTPS.
 |---|---|---|
 | Database | SQLite | PostgreSQL |
 | Uploads | local filesystem | S3-compatible storage, in a build that enables it |
-| Media | Paracord's QUIC/WebTransport stack | LiveKit, if you want a WebRTC SFU |
+| Media | Archlast Mercury's QUIC/WebTransport stack | LiveKit, if you want a WebRTC SFU |
 | HTTPS | a certificate the server makes itself | a reverse proxy, or ACME certificates |
 
 SQLite carries a small server fine. PostgreSQL is the one to move to for sustained
@@ -329,14 +329,14 @@ web client the server already serves.
 
 | | File | Notes |
 |---|---|---|
-| Windows | `Paracord-Setup-<ver>.exe` | the guided installer, and the one to use. `Paracord_<ver>_x64_en-US.msi` is there too |
-| Linux | `Paracord_<ver>_amd64.AppImage` | portable, no install. Or `Paracord_<ver>_amd64.deb` / `Paracord-<ver>-1.x86_64.rpm` |
-| macOS | `Paracord_<ver>_aarch64.dmg` | Apple Silicon. `Paracord_<ver>_x64.dmg` for Intel. Unsigned: right-click → Open the first time |
+| Windows | `Archlast-Mercury-Setup-<ver>.exe` | the guided installer, and the one to use. `Archlast-Mercury_<ver>_x64_en-US.msi` is there too |
+| Linux | `Archlast-Mercury_<ver>_amd64.AppImage` | portable, no install. Or `Archlast-Mercury_<ver>_amd64.deb` / `Archlast-Mercury-<ver>-1.x86_64.rpm` |
+| macOS | `Archlast-Mercury_<ver>_aarch64.dmg` | Apple Silicon. `Archlast-Mercury_<ver>_x64.dmg` for Intel. Unsigned: right-click → Open the first time |
 | Browser | nothing to install | open `https://<your-server>:8443`, which the server serves itself |
 
-Server packages are on the same page: `paracord-server-linux-x64-<ver>.tar.gz`,
-`paracord-server-windows-x64-<ver>.zip`, `paracord-server-macos-arm64-<ver>.tar.gz` and
-`paracord-server-macos-x64-<ver>.tar.gz`.
+Server packages are on the same page: `mercury-server-linux-x64-<ver>.tar.gz`,
+`mercury-server-windows-x64-<ver>.zip`, `mercury-server-macos-arm64-<ver>.tar.gz` and
+`mercury-server-macos-x64-<ver>.tar.gz`.
 
 The desktop app asks for your invite link on first launch. A plain server address works
 too.
@@ -350,23 +350,23 @@ for the desktop builds.
 
 ```text
 crates/
-├── paracord-server       # the binary: config, TLS, embedded web client
-├── paracord-api          # HTTP API
-├── paracord-ws           # realtime gateway
-├── paracord-core         # permissions, services, event bus
-├── paracord-db           # SQLite and PostgreSQL persistence
-├── paracord-models       # shared types and permission flags
-├── paracord-transport    # QUIC and WebTransport
-├── paracord-relay        # encrypted media routing
-├── paracord-codec        # Opus, RNNoise and VP9
-├── paracord-media        # file storage, optional LiveKit
-└── paracord-federation   # signed server-to-server protocol
+├── mercury-server       # the binary: config, TLS, embedded web client
+├── mercury-api          # HTTP API
+├── mercury-ws           # realtime gateway
+├── mercury-core         # permissions, services, event bus
+├── mercury-db           # SQLite and PostgreSQL persistence
+├── mercury-models       # shared types and permission flags
+├── mercury-transport    # QUIC and WebTransport
+├── mercury-relay        # encrypted media routing
+├── mercury-codec        # Opus, RNNoise and VP9
+├── mercury-media        # file storage, optional LiveKit
+└── mercury-federation   # signed server-to-server protocol
 
 client/                   # React web app and Tauri desktop shell
-packages/paracord-bot-sdk # bot SDK
+packages/archlast-mercury-bot-sdk # bot SDK
 ```
 
-Release builds compile `client/dist` into `paracord-server`, so the single binary serves
+Release builds compile `client/dist` into `mercury-server`, so the single binary serves
 the web client itself.
 
 ## Development
@@ -383,7 +383,7 @@ Run the client against a local server:
 cd client && npm install && npm run dev
 
 # terminal 2
-cargo run --bin paracord-server --no-default-features
+cargo run --bin mercury-server --no-default-features
 ```
 
 Vite serves `http://localhost:1420` and proxies the API to the server. The
@@ -406,12 +406,12 @@ Build a release server with the current web client inside it, then the desktop a
 
 ```bash
 cd client && npm install && npm run build && cd ..
-cargo build --release --bin paracord-server
+cargo build --release --bin mercury-server
 
 cd client && npx tauri build
 ```
 
-The `vpx` feature in `paracord-codec` is on by default and turning it off to get past a
+The `vpx` feature in `mercury-codec` is on by default and turning it off to get past a
 build error is the wrong move: the build succeeds and video and screen sharing then fail at
 runtime with nothing to explain why. Fix the libvpx setup instead. On recent Linux
 toolchains the AppImage build needs `NO_STRIP=1`, because linuxdeploy's bundled `strip`
@@ -435,7 +435,7 @@ cannot read the relocation sections a modern linker emits.
 
 ## Licence and contributing
 
-Paracord is source-available rather than open source, under the [Paracord Source-Available
+Archlast Mercury is source-available rather than open source, under the [Archlast Mercury Source-Available
 License](LICENSE). You can run it for anything, including a business. You can read the
 source, modify it for your own machines, and pass the official releases around unchanged.
 Publishing a modified version, or a fork for other people to use, needs written permission

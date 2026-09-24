@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tokio::sync::mpsc;
 
-use paracord_codec::audio::resample::{StereoResampler, STEREO_FRAME_SAMPLES};
+use mercury_codec::audio::resample::{StereoResampler, STEREO_FRAME_SAMPLES};
 
 /// Sink for captured system audio: contract C4 delivers 48kHz stereo interleaved
 /// 20ms frames (1920 samples) straight into the media session's `screen_audio_tx`.

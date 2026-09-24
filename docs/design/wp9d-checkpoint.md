@@ -264,7 +264,7 @@ package's captures). Regenerate with:
 
 ```
 cd client
-PARACORD_E2E_MOTION=1 PARACORD_E2E_MOTION_FRAMES=1 npx playwright test --grep "capture the WP9d"
+MERCURY_E2E_MOTION=1 MERCURY_E2E_MOTION_FRAMES=1 npx playwright test --grep "capture the WP9d"
 ```
 
 - `voice-0000ms.png` … `-2100ms.png` — the ring through a two-second phrase,

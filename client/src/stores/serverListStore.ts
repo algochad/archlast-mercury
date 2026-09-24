@@ -68,7 +68,7 @@ export function normalizeServerUrl(url: string): string {
 /**
  * Best default target to pre-fill on the connect screen.
  *
- * In a browser build the UI is served by its own Paracord server, so the
+ * In a browser build the UI is served by its own Archlast Mercury server, so the
  * current origin is the right server to connect to. In the desktop shell there
  * is no implicit server — it supplies its own default — so this returns empty.
  */

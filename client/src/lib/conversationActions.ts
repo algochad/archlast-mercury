@@ -65,7 +65,7 @@ function applyPlatformLimits(
   let next = decision;
   if (next.allowed && action === 'attach' && !platform.files) next = blocked('File uploads are not supported by this device.', false);
   if (next.allowed && ['voice', 'video', 'screen_share'].includes(action)) {
-    if (!platform.secureContext) next = blocked('Open Paracord over HTTPS or in the desktop app to make a call.');
+    if (!platform.secureContext) next = blocked('Open Archlast Mercury over HTTPS or in the desktop app to make a call.');
     else if (!platform.microphone) next = blocked('This device does not support microphone access.', false);
     else if (action === 'screen_share' && !platform.screenShare) next = blocked('Screen sharing is not supported by this device.', false);
   }
@@ -96,7 +96,7 @@ export function resolveConversationActions(
       } else if (server.encrypted && action === 'schedule' && !features.encryptedScheduling) {
         decision = blocked('Encrypted message scheduling is not available in this client yet.', false);
       } else if (server.encrypted && ['send', 'attach', 'schedule'].includes(action)) {
-        if (!platform.secureContext) decision = blocked('Open Paracord over HTTPS or in the desktop app to use encryption.');
+        if (!platform.secureContext) decision = blocked('Open Archlast Mercury over HTTPS or in the desktop app to use encryption.');
         else if (!server.own_identity_enrolled || encryption === 'setup') decision = blocked('Set up encryption before sending in this conversation.');
         // A device holding no identity, or a different one, cannot "unlock"
         // its way out: there is nothing here to unlock. Say what is true, and

@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nickkadutskyi/jb-tauri-v2-schema/main/schema.json",
-  "productName": "Paracord",
+  "productName": "Archlast Mercury",
   "version": "3.1.1",
-  "identifier": "com.paracord.desktop",
+  "identifier": "com.archlast.mercury",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Paracord",
+        "title": "Archlast Mercury",
         "visible": false,
         "width": 1280,
         "height": 800,
@@ -41,13 +41,13 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["paracord"]
+        "schemes": ["mercury", "archlast-mercury", "paracord"]
       }
     },
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/Scdouglas1999/Paracord/releases/latest/download/latest.json"
+        "https://github.com/algochad/archlast-mercury/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFERkJFNzVBNzg1RTFDNEMKUldSTUhGNTRXdWY3clEzdm0xRys4RUtsNnYyS1o3cHkwQzh4bkpya3VWY1lkWlo4WkRyRC85MEkK"
     }

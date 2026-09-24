@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify isolated archive recovery using an already-built paracord-server.
+"""Verify isolated archive recovery using an already-built mercury-server.
 
 PARACORD_RESTORE_BINARY must point to the current server. SQLite always runs;
 PARACORD_TEST_POSTGRES_URL enables isolated PostgreSQL source/target cases.

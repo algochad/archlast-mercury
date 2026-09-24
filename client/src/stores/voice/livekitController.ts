@@ -106,7 +106,7 @@ function getWindowOriginLivekitUrl(): string | null {
     return null;
   }
   // In Tauri, window.location.origin is "https://tauri.localhost" which has
-  // nothing to do with the actual Paracord server. Attempting to connect to
+  // nothing to do with the actual Archlast Mercury server. Attempting to connect to
   // wss://tauri.localhost/livekit stalls for 30+ seconds on Windows DNS
   // resolution (mDNS/LLMNR) and is never valid. Skip it entirely.
   if (isTauri()) {
@@ -144,7 +144,7 @@ function allowDirectLivekitFallback(): boolean {
 /**
  * Whether a native-media failure may silently fall back to LiveKit.
  *
- * v1 default: OFF. Paracord is native-first — the QUIC media engine is the
+ * v1 default: OFF. Archlast Mercury is native-first — the QUIC media engine is the
  * product, and LiveKit is only an explicit opt-in fallback that an operator or
  * user must enable via VITE_ENABLE_NATIVE_TO_LIVEKIT_FALLBACK. When the env var
  * is unset (or not a recognized truthy value) we return false so a native

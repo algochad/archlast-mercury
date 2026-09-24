@@ -1,10 +1,10 @@
 # PostgreSQL `pg_trgm` Prerequisite (Member Search)
 
-On PostgreSQL, Paracord's member search is backed by **trigram GIN indexes** for
+On PostgreSQL, Archlast Mercury's member search is backed by **trigram GIN indexes** for
 fast, case-insensitive substring matching on usernames and nicknames. These
 indexes require the `pg_trgm` extension.
 
-The migration `crates/paracord-db/migrations_pg/20260304000001_member_search_trgm.sql`
+The migration `crates/mercury-db/migrations_pg/20260304000001_member_search_trgm.sql`
 runs:
 
 ```sql
@@ -31,14 +31,14 @@ been explicitly granted `CREATE`). If the role that runs the migrations lacks
 that privilege, this migration fails with a permission error and startup /
 migration aborts.
 
-> The compose `postgres` service in `docker-compose.yml` runs as a superuser (`POSTGRES_USER: paracord` owns the `paracord` database), so `pg_trgm` creation needs no extra step with `--profile postgres`. External or managed PostgreSQL still needs the workaround below.
+> The compose `postgres` service in `docker-compose.yml` runs as a superuser (`POSTGRES_USER: mercury` owns the `mercury` database), so `pg_trgm` creation needs no extra step with `--profile postgres`. External or managed PostgreSQL still needs the workaround below.
 ## Managed / locked-down PostgreSQL
 
 Many managed PostgreSQL providers (RDS, Cloud SQL, Azure Database, Supabase,
 Neon, …) run application roles **without** superuser and sometimes restrict
 which extensions may be created. `pg_trgm` is a standard `contrib` extension and
 is on the allow-list of essentially every managed provider, but you may need to
-enable it out-of-band, before Paracord's migrations run, as an administrator.
+enable it out-of-band, before Archlast Mercury's migrations run, as an administrator.
 
 Pre-provision it one of these ways (all idempotent):
 
@@ -55,7 +55,7 @@ Pre-provision it one of these ways (all idempotent):
   `CREATE EXTENSION IF NOT EXISTS pg_trgm;` above run by the instance's master
   user (or a role granted `rds_superuser`) is sufficient.
 
-Once the extension exists, Paracord's `CREATE EXTENSION IF NOT EXISTS` is a
+Once the extension exists, Archlast Mercury's `CREATE EXTENSION IF NOT EXISTS` is a
 no-op and the index migration proceeds normally, even for a role without
 `CREATE` on extensions.
 

@@ -12,7 +12,7 @@ async function database() {
     let blocked = false;
     const opening = indexedDB.open(DATABASE, 1);
     opening.onupgradeneeded = () => opening.result.createObjectStore(STORE);
-    opening.onblocked = () => { blocked = true; reject(new Error('Close other Paracord windows to upgrade encrypted device keys.')); };
+    opening.onblocked = () => { blocked = true; reject(new Error('Close other Archlast Mercury windows to upgrade encrypted device keys.')); };
     opening.onerror = () => reject(opening.error ?? new Error('Encrypted device keys could not be opened.'));
     opening.onsuccess = () => { if (blocked) opening.result.close(); else resolve(opening.result); };
   });

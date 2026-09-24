@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Paracord server installer for Windows - one command, install and upgrade.
+    Archlast Mercury server installer for Windows - one command, install and upgrade. (Compat alias: Paracord)
 
 .DESCRIPTION
     One line in a normal PowerShell window:
 
-        irm https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.ps1 | iex
+        irm https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.ps1 | iex
 
     Running it that way needs no execution-policy flag (the script is never
     saved and run as a file), and the script asks Windows for administrator
@@ -14,11 +14,11 @@
     installs just for you instead.
 
     It downloads the Windows server release, installs it, generates the config
-    via `paracord-server init`, starts the server, turns the one-time owner
+    via `mercury-server init` (compat: also accepts paracord-server), starts the server, turns the one-time owner
     setup token into a ready-to-open link and opens that link in the browser.
 
     Re-running upgrades the binary in place: config\ and data\ are preserved and
-    the previous paracord-server.exe is kept under backups\.
+    the previous mercury-server.exe is kept under backups\ (compat alias: paracord-server.exe).
 
     It also still works as a file:
 
@@ -26,34 +26,34 @@
 
 .PARAMETER Version
     Release version to install ("2.0.0" or "v2.0.0"). Defaults to the latest
-    release resolved via the GitHub API. Env fallback: PARACORD_VERSION.
+    release resolved via the GitHub API. Env fallback: MERCURY_VERSION (PARACORD_VERSION still works).
 
 .PARAMETER InstallDir
-    Install destination. Default: %ProgramFiles%\Paracord when elevated,
-    %LOCALAPPDATA%\Paracord otherwise. Env fallback: PARACORD_INSTALL_DIR.
+    Install destination. Default: %ProgramFiles%\Mercury when elevated,
+    %LOCALAPPDATA%\Mercury otherwise (falls back to Paracord path when upgrading). Env fallback: MERCURY_INSTALL_DIR (PARACORD_INSTALL_DIR also works).
 
 .PARAMETER ReleaseBaseUrl
-    URL base holding <tag>/<asset>. Env fallback: PARACORD_RELEASE_BASE_URL.
+    URL base holding <tag>/<asset>. Env fallback: MERCURY_RELEASE_BASE_URL (PARACORD_RELEASE_BASE_URL also works).
 
 .PARAMETER LocalArchive
-    Path to a local paracord-server-windows-x64-*.zip for offline installs.
-    Env fallback: PARACORD_LOCAL_ARCHIVE.
+    Path to a local mercury-server-windows-x64-*.zip for offline installs (compat: paracord-server-* also accepted).
+    Env fallback: MERCURY_LOCAL_ARCHIVE (PARACORD_LOCAL_ARCHIVE also works).
 
 .PARAMETER GitHubRepo
-    owner/repo for release lookup. Env fallback: PARACORD_GITHUB_REPO
-    (default Scdouglas1999/Paracord).
+    owner/repo for release lookup. Env fallback: MERCURY_GITHUB_REPO (PARACORD_GITHUB_REPO also works)
+    (default algochad/archlast-mercury).
 
 .PARAMETER NoService
     Skip auto-start registration (and, for a per-user install, skip starting the
-    server). Env fallback: PARACORD_NO_SERVICE=1.
+    server). Env fallback: MERCURY_NO_SERVICE=1 (PARACORD_NO_SERVICE also works).
 
 .PARAMETER NoBrowser
     Never open a browser; just print the setup link.
-    Env fallback: PARACORD_NO_BROWSER=1.
+    Env fallback: MERCURY_NO_BROWSER=1 (PARACORD_NO_BROWSER also works).
 
 .PARAMETER NoElevate
     Never ask for administrator permission; install just for this user.
-    Env fallback: PARACORD_NO_ELEVATE=1.
+    Env fallback: MERCURY_NO_ELEVATE=1 (PARACORD_NO_ELEVATE also works).
 
 .PARAMETER Relaunched
     Internal. Set on the copy this script starts for itself after the Windows
@@ -76,32 +76,33 @@ param(
 # `iex`, and #Requires is only honoured for real script files. A plain check
 # works in both shapes.
 if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "paracord-install: error: this needs Windows PowerShell 5.1 or newer (found $($PSVersionTable.PSVersion))."
+    throw "mercury-install: error: this needs Windows PowerShell 5.1 or newer (found $($PSVersionTable.PSVersion))."
 }
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # -- Env-var fallbacks (parity with scripts/install.sh) ----------------------
-if (-not $Version)        { $Version        = $env:PARACORD_VERSION }
-if (-not $InstallDir)     { $InstallDir     = $env:PARACORD_INSTALL_DIR }
-if (-not $ReleaseBaseUrl) { $ReleaseBaseUrl = $env:PARACORD_RELEASE_BASE_URL }
-if (-not $LocalArchive)   { $LocalArchive   = $env:PARACORD_LOCAL_ARCHIVE }
-if (-not $GitHubRepo)     { $GitHubRepo     = $env:PARACORD_GITHUB_REPO }
-if (-not $GitHubRepo)     { $GitHubRepo     = 'Scdouglas1999/Paracord' }
+# MERCURY_* preferred; PARACORD_* fallback for backward compat (one version).
+if (-not $Version)        { $Version        = $env:MERCURY_VERSION; if (-not $Version) { $Version = $env:PARACORD_VERSION } }
+if (-not $InstallDir)     { $InstallDir     = $env:MERCURY_INSTALL_DIR; if (-not $InstallDir) { $InstallDir = $env:PARACORD_INSTALL_DIR } }
+if (-not $ReleaseBaseUrl) { $ReleaseBaseUrl = $env:MERCURY_RELEASE_BASE_URL; if (-not $ReleaseBaseUrl) { $ReleaseBaseUrl = $env:PARACORD_RELEASE_BASE_URL } }
+if (-not $LocalArchive)   { $LocalArchive   = $env:MERCURY_LOCAL_ARCHIVE; if (-not $LocalArchive) { $LocalArchive = $env:PARACORD_LOCAL_ARCHIVE } }
+if (-not $GitHubRepo)     { $GitHubRepo     = $env:MERCURY_GITHUB_REPO; if (-not $GitHubRepo) { $GitHubRepo = $env:PARACORD_GITHUB_REPO } }
+if (-not $GitHubRepo)     { $GitHubRepo     = 'algochad/archlast-mercury' }
 if (-not $ReleaseBaseUrl) { $ReleaseBaseUrl = "https://github.com/$GitHubRepo/releases/download" }
-if ($env:PARACORD_NO_SERVICE -eq '1') { $NoService = [switch]$true }
-if ($env:PARACORD_NO_BROWSER -eq '1') { $NoBrowser = [switch]$true }
-if ($env:PARACORD_NO_ELEVATE -eq '1') { $NoElevate = [switch]$true }
+if ($env:MERCURY_NO_SERVICE -eq '1' -or $env:PARACORD_NO_SERVICE -eq '1') { $NoService = [switch]$true }
+if ($env:MERCURY_NO_BROWSER -eq '1' -or $env:PARACORD_NO_BROWSER -eq '1') { $NoBrowser = [switch]$true }
+if ($env:MERCURY_NO_ELEVATE -eq '1' -or $env:PARACORD_NO_ELEVATE -eq '1') { $NoElevate = [switch]$true }
 
-$TaskName = 'Paracord Server'
+$TaskName = 'Archlast Mercury Server'
 $ApiUrl   = "https://api.github.com/repos/$GitHubRepo/releases/latest"
 $DocsUrl  = "https://github.com/$GitHubRepo/blob/main/docs/port-forwarding.md"
 $SelfUrl  = $env:PARACORD_SCRIPT_URL
 if (-not $SelfUrl) { $SelfUrl = "https://raw.githubusercontent.com/$GitHubRepo/main/scripts/install.ps1" }
 
 function Write-Step([string]$msg) { Write-Host "`n==> $msg" }
-function Fail([string]$msg) { throw "paracord-install: error: $msg" }
+function Fail([string]$msg) { throw "mercury-install: error: $msg" }
 # The closing Details block is deliberately quieter than the steps above it.
 function Write-Dim([string]$msg) { Write-Host $msg -ForegroundColor DarkGray }
 
@@ -151,13 +152,13 @@ function Get-TomlValue([string]$path, [string]$section, [string]$key) {
 $arch = $env:PROCESSOR_ARCHITECTURE
 if ($env:PROCESSOR_ARCHITEW6432) { $arch = $env:PROCESSOR_ARCHITEW6432 }
 if ($arch -ne 'AMD64') {
-    Fail "no prebuilt Paracord server for Windows/$arch - releases ship x64 only"
+    Fail "no prebuilt Archlast Mercury server for Windows/$arch - releases ship x64 only"
 }
 
 # GitHub requires TLS 1.2+ and a User-Agent. Set before any download, including
 # the one the elevation step below makes.
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$headers = @{ 'User-Agent' = 'paracord-install' }
+$headers = @{ 'User-Agent' = 'mercury-install' }
 
 $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
@@ -173,7 +174,7 @@ $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 $canElevate = (-not $IsAdmin) -and (-not $NoElevate) -and (-not $InstallDir) -and (-not $LocalArchive) `
     -and [Environment]::UserInteractive
 if ($canElevate) {
-    Write-Host 'Installing Paracord for this whole computer - so it starts by itself and your friends can reach it - needs administrator permission.'
+    Write-Host 'Installing Archlast Mercury for this whole computer - so it starts by itself and your friends can reach it - needs administrator permission.'
     Write-Host 'Choose Yes in the Windows box that appears; the install then continues in a new window.'
     $handedOver = $false
     try {
@@ -198,7 +199,7 @@ if ($canElevate) {
         $handedOver = $true
     } catch {
         Write-Host ''
-        Write-Host 'No administrator permission, so Paracord is being installed just for you.'
+        Write-Host 'No administrator permission, so Archlast Mercury is being installed just for you.'
         Write-Host 'It will start when you log in, and you can re-run this later to install it for the whole computer.'
     }
     if ($handedOver) {
@@ -210,20 +211,28 @@ if ($canElevate) {
 
 # -- Paths --------------------------------------------------------------------
 if (-not $InstallDir) {
-    if ($IsAdmin) { $InstallDir = Join-Path $env:ProgramFiles 'Paracord' }
-    else          { $InstallDir = Join-Path $env:LOCALAPPDATA 'Paracord' }
+    # Prefer new path; fall back to old if it already exists (upgrade)
+    if ($IsAdmin) {
+        $legacy = Join-Path $env:ProgramFiles 'Paracord'
+        $preferred = Join-Path $env:ProgramFiles 'Mercury'
+        $InstallDir = if ((Test-Path $legacy) -and -not (Test-Path $preferred)) { $legacy } else { $preferred }
+    } else {
+        $legacy = Join-Path $env:LOCALAPPDATA 'Paracord'
+        $preferred = Join-Path $env:LOCALAPPDATA 'Mercury'
+        $InstallDir = if ((Test-Path $legacy) -and -not (Test-Path $preferred)) { $legacy } else { $preferred }
+    }
 }
 $InstallDir  = [System.IO.Path]::GetFullPath($InstallDir)
-$ConfigPath  = Join-Path $InstallDir 'config\paracord.toml'
+$ConfigPath  = Join-Path $InstallDir 'config\mercury.toml'
 $ConfigDir   = Split-Path $ConfigPath
 $DataDir     = Join-Path $InstallDir 'data'
-$ExePath     = Join-Path $InstallDir 'paracord-server.exe'
+$ExePath     = Join-Path $InstallDir 'mercury-server.exe'
 $BackupsDir  = Join-Path $InstallDir 'backups'
 # Forward-slash form for the config file: sqlite:// URLs and std::path both
 # accept it on Windows, and it avoids TOML escaping problems.
 $InstallDirFwd = $InstallDir -replace '\\', '/'
 
-$TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("paracord-install-" + [guid]::NewGuid().ToString('N'))
+$TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("mercury-install-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $TmpDir -Force | Out-Null
 
 # State the ending text reads.
@@ -236,7 +245,7 @@ $claimSource   = ''
 $browserOpened = $false
 
 try {
-    Write-Host "Paracord server installer"
+    Write-Host "Archlast Mercury server installer (compat: Paracord)"
     if ($IsAdmin) {
         Write-Host "Installing for everyone on this computer. The server will start with the computer."
     } else {
@@ -253,7 +262,7 @@ try {
         if ($Version) {
             $tag = if ($Version.StartsWith('v')) { $Version } else { "v$Version" }
         } else {
-            Write-Step "Resolving latest Paracord release"
+            Write-Step "Resolving latest Archlast Mercury release"
             try {
                 $tag = (Invoke-RestMethod -Uri $ApiUrl -Headers $headers).tag_name
             } catch {
@@ -263,7 +272,7 @@ try {
         }
         $versionNum = $tag.TrimStart('v')
         $versionLabel = $versionNum
-        $asset = "paracord-server-windows-x64-$versionNum.zip"
+        $asset = "mercury-server-windows-x64-$versionNum.zip"
         $downloadUrl = "$ReleaseBaseUrl/$tag/$asset"
         Write-Host "Release: $tag  asset: $asset"
     }
@@ -274,7 +283,8 @@ try {
         $asset = Split-Path $archive -Leaf
         # Offline installs have no release tag; the archive name usually carries
         # the version.
-        if ($asset -match '^paracord-server-windows-x64-(.+)\.zip$') { $versionLabel = $Matches[1] }
+        if ($asset -match '^mercury-server-windows-x64-(.+)\.zip$') { $versionLabel = $Matches[1] }
+        elseif ($asset -match '^paracord-server-windows-x64-(.+)\.zip$') { $versionLabel = $Matches[1] }
     } else {
         $archive = Join-Path $TmpDir $asset
         Write-Step "Downloading $downloadUrl"
@@ -315,18 +325,19 @@ try {
         }
         Write-Host "SHA-256 verified: $actual"
     } elseif ($csumFound) {
-        Write-Warning "paracord-install: a checksum file was published but has no entry for $asset; cannot verify - installing anyway"
+        Write-Warning "mercury-install: a checksum file was published but has no entry for $asset; cannot verify - installing anyway"
     } else {
-        Write-Warning "paracord-install: this release does not publish SHA-256 checksums - the archive cannot be integrity-verified. Downloaded from the official $GitHubRepo releases over TLS."
+        Write-Warning "mercury-install: this release does not publish SHA-256 checksums - the archive cannot be integrity-verified. Downloaded from the official $GitHubRepo releases over TLS. (Compat: Paracord)"
     }
 
     # -- Extract -------------------------------------------------------------
     Write-Step "Unpacking"
     $extract = Join-Path $TmpDir 'x'
     Expand-Archive -Path $archive -DestinationPath $extract -Force
-    # Zip layout: files at the archive root, or under a paracord-server\ dir.
-    $serverExe = Get-ChildItem -Path $extract -Recurse -Filter 'paracord-server.exe' | Select-Object -First 1
-    if (-not $serverExe) { Fail "archive contains no paracord-server.exe - unexpected layout" }
+    # Zip layout: files at the archive root, or under a mercury-server\ dir (compat: paracord-server).
+    $serverExe = Get-ChildItem -Path $extract -Recurse -Filter 'mercury-server.exe' | Select-Object -First 1
+    if (-not $serverExe) { $serverExe = Get-ChildItem -Path $extract -Recurse -Filter 'paracord-server.exe' | Select-Object -First 1 }
+    if (-not $serverExe) { Fail "archive contains no mercury-server.exe (or paracord-server.exe) - unexpected layout" }
     $payloadDir = $serverExe.Directory.FullName
 
     # -- Install -------------------------------------------------------------
@@ -352,7 +363,7 @@ try {
                 Start-Sleep -Seconds 2
             }
         }
-        $backup = Join-Path $BackupsDir ("paracord-server-{0}.exe" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        $backup = Join-Path $BackupsDir ("mercury-server-{0}.exe" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
         Move-Item $ExePath $backup -Force
         Write-Host "Previous binary backed up to $backup"
     }
@@ -360,10 +371,16 @@ try {
     Get-ChildItem -Path $stage -File | ForEach-Object {
         Move-Item $_.FullName (Join-Path $InstallDir $_.Name) -Force
     }
+    # Compat alias: keep paracord-server.exe -> mercury-server.exe
+    if ((Test-Path $ExePath) -and -not (Test-Path (Join-Path $InstallDir 'paracord-server.exe'))) {
+        Copy-Item $ExePath (Join-Path $InstallDir 'paracord-server.exe') -Force
+    } elseif ((-not (Test-Path $ExePath)) -and (Test-Path (Join-Path $InstallDir 'paracord-server.exe'))) {
+        Copy-Item (Join-Path $InstallDir 'paracord-server.exe') $ExePath -Force
+    }
     Remove-Item $stage -Recurse -Force
     if (-not (Test-Path $ExePath)) { Fail "install did not produce $ExePath" }
     if (-not (Test-Path (Join-Path $InstallDir 'livekit-server.exe'))) {
-        # Not a problem: voice and video run on Paracord's own media engine.
+        # Not a problem: voice and video run on Archlast Mercury's own media engine (compat: Paracord).
         Write-Host "Note: this build ships no optional LiveKit companion - voice and video do not need it."
     }
 
@@ -387,12 +404,12 @@ try {
         if ($initCode -ne 0) {
             Show-TextFile $initLog
             Show-TextFile $initErr
-            Fail "paracord-server init exited with code $initCode"
+            Fail "mercury-server init exited with code $initCode"
         }
         if (-not (Test-Path $ConfigPath)) {
             Show-TextFile $initLog
             Show-TextFile $initErr
-            Fail "paracord-server init did not create $ConfigPath"
+            Fail "mercury-server init did not create $ConfigPath"
         }
 
         # Pin the generated ./data/... paths to the install directory so the
@@ -435,8 +452,8 @@ try {
         Write-Step "Letting friends reach this computer on port $webPort"
         $made = 0
         $wanted = @(
-            @{ Name = "Paracord Server app (TCP $webPort)";               Proto = 'TCP'; Port = $webPort },
-            @{ Name = "Paracord Server voice and video (UDP $voicePort)"; Proto = 'UDP'; Port = $voicePort }
+            @{ Name = "Archlast Mercury Server app (TCP $webPort)";               Proto = 'TCP'; Port = $webPort },
+            @{ Name = "Archlast Mercury Server voice and video (UDP $voicePort)"; Proto = 'UDP'; Port = $voicePort }
         )
         try {
             foreach ($rule in $wanted) {
@@ -456,9 +473,9 @@ try {
             # Older systems without the NetSecurity module. A missing netsh must
             # not fail an install that is otherwise finished.
             try {
-                & netsh advfirewall firewall add rule "name=Paracord Server TCP $webPort" dir=in action=allow protocol=TCP localport=$webPort | Out-Null
+                & netsh advfirewall firewall add rule "name=Archlast Mercury Server TCP $webPort" dir=in action=allow protocol=TCP localport=$webPort | Out-Null
                 if ($LASTEXITCODE -eq 0) { $made = 1 }
-                & netsh advfirewall firewall add rule "name=Paracord Server UDP $voicePort" dir=in action=allow protocol=UDP localport=$voicePort | Out-Null
+                & netsh advfirewall firewall add rule "name=Archlast Mercury Server UDP $voicePort" dir=in action=allow protocol=UDP localport=$voicePort | Out-Null
                 if ($LASTEXITCODE -eq 0) { $made = 1 }
             } catch {
                 $made = 0
@@ -468,9 +485,9 @@ try {
             $firewallNote = "opened for port $webPort (TCP) and $voicePort (UDP)"
         } else {
             $firewallNote = 'could not be opened; friends outside this computer cannot connect yet'
-            Write-Warning "paracord-install: could not create firewall rules - add them manually:"
-            Write-Warning ('  netsh advfirewall firewall add rule name="Paracord TCP" dir=in action=allow protocol=TCP localport=' + $webPort)
-            Write-Warning ('  netsh advfirewall firewall add rule name="Paracord UDP" dir=in action=allow protocol=UDP localport=' + $voicePort)
+            Write-Warning "mercury-install: could not create firewall rules - add them manually:"
+            Write-Warning ('  netsh advfirewall firewall add rule name="Mercury TCP" dir=in action=allow protocol=TCP localport=' + $webPort)
+            Write-Warning ('  netsh advfirewall firewall add rule name="Mercury UDP" dir=in action=allow protocol=UDP localport=' + $voicePort)
         }
     } else {
         $firewallNote = 'not opened (that needs administrator permission), so only this computer can reach the server'
@@ -478,12 +495,12 @@ try {
 
     # -- Auto-start ----------------------------------------------------------
     if ($IsAdmin -and -not $NoService) {
-        Write-Step "Setting Paracord to start with the computer"
+        Write-Step "Setting Archlast Mercury to start with the computer"
         if (-not (Get-Command Register-ScheduledTask -ErrorAction SilentlyContinue)) {
             Fail "the ScheduledTasks module is not available on this system - re-run with -NoService and start the server manually"
         }
 
-        # paracord-server is a plain console executable - it never calls
+        # mercury-server is a plain console executable - it never calls
         # StartServiceCtrlDispatcher, so SCM registration (sc.exe create) can
         # only fail: every start dies with error 1053 "did not respond in a
         # timely fashion". A scheduled task with an AtStartup trigger is the
@@ -491,8 +508,9 @@ try {
         # restart settings cover crashes.
         $legacy = Get-Service -Name 'Paracord' -ErrorAction SilentlyContinue
         if ($legacy) {
-            Write-Warning "paracord-install: a legacy 'Paracord' Windows service registration exists from an older installer - it can never start (the server is not service-aware). Remove it with: sc.exe delete Paracord"
+            Write-Warning "mercury-install: a legacy 'Paracord' Windows service registration exists from an older installer - it can never start (the server is not service-aware). Remove it with: sc.exe delete Paracord"
         }
+        $legacy2 = Get-Service -Name 'Mercury' -ErrorAction SilentlyContinue
 
         $action = New-ScheduledTaskAction -Execute $ExePath `
             -Argument ('-c "{0}"' -f $ConfigPath) `
@@ -506,7 +524,7 @@ try {
             -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
         Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
             -Principal $principal -Settings $settings -Force `
-            -Description 'Paracord self-hosted chat server' | Out-Null
+            -Description 'Archlast Mercury self-hosted chat server (compat: Paracord)' | Out-Null
         $serviceDesc = "scheduled task '$TaskName' (starts with the computer, restarts on crash)"
 
         # The task runs as SYSTEM, and `init` may ACL the generated config to
@@ -556,20 +574,20 @@ try {
         Write-Step "Adding Paracord to the Start Menu and starting it"
         $wsh = New-Object -ComObject WScript.Shell
         $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-        $shortcutPath = Join-Path $startMenu 'Paracord Server.lnk'
+        $shortcutPath = Join-Path $startMenu 'Archlast Mercury Server.lnk'
         $sc = $wsh.CreateShortcut($shortcutPath)
         $sc.TargetPath = $ExePath
         $sc.Arguments = "-c `"$ConfigPath`""
         $sc.WorkingDirectory = $InstallDir
         $sc.Save()
-        $startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\Paracord Server.lnk'
+        $startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\Archlast Mercury Server.lnk'
         Copy-Item $shortcutPath $startup -Force
         $serviceDesc = 'Start Menu shortcut plus a Startup entry (starts when you log in)'
         Start-Process -FilePath $ExePath -ArgumentList "-c `"$ConfigPath`"" -WorkingDirectory $InstallDir
         $serverStarted = $true
     } else {
         Write-Host "Auto-start skipped (-NoService). Start the server with:"
-        Write-Host "    cd `"$InstallDir`"; .\paracord-server.exe -c `"$ConfigPath`""
+        Write-Host "    cd `"$InstallDir`"; .\mercury-server.exe -c `"$ConfigPath`"  # compat: paracord-server.exe also works"
     }
 
     # -- The one link that finishes setup ------------------------------------
@@ -634,19 +652,19 @@ try {
         $tail = '.'
         if ($serverStarted) { $tail = ' and restarted.' }
         if ($versionLabel) {
-            Write-Host ('Paracord was updated to ' + $versionLabel + $tail)
+            Write-Host ('Archlast Mercury was updated to ' + $versionLabel + $tail)
         } else {
-            Write-Host ('Paracord was updated' + $tail)
+            Write-Host ('Archlast Mercury was updated' + $tail)
         }
         Write-Host 'Your accounts, messages and settings are kept.'
         if (-not $serverStarted) {
-            Write-Host ("Start it again with:  cd `"$InstallDir`"; .\paracord-server.exe -c `"$ConfigPath`"")
+            Write-Host ("Start it again with:  cd `"$InstallDir`"; .\mercury-server.exe -c `"$ConfigPath`"  # compat: paracord-server.exe also works")
         }
     } else {
         if ($serverStarted) {
-            Write-Host 'Paracord is installed and running.'
+            Write-Host 'Archlast Mercury is installed and running.'
         } else {
-            Write-Host 'Paracord is installed.'
+            Write-Host 'Archlast Mercury is installed.'
         }
         Write-Host ''
         if ($claimLink) {
@@ -668,7 +686,7 @@ try {
             }
         } else {
             Write-Host '1. Start the server:'
-            Write-Host ("     cd `"$InstallDir`"; .\paracord-server.exe -c `"$ConfigPath`"")
+            Write-Host ("     cd `"$InstallDir`"; .\mercury-server.exe -c `"$ConfigPath`"  # compat: paracord-server.exe also works")
             Write-Host '   It prints a link that finishes setting up - open that link in your browser.'
         }
         Write-Host '2. Then invite friends: open your server in the app and press Invite.'

@@ -22,7 +22,7 @@ if (isTauri() && 'serviceWorker' in navigator) {
       const message = reason instanceof Error ? reason.message : String(reason);
       // The desktop WebView deliberately rejects service-worker access. This is
       // the expected secure configuration, not an application failure.
-      if (message === 'PWA service workers are disabled in Paracord desktop') {
+      if (message === 'PWA service workers are disabled in Archlast Mercury desktop') {
         return;
       }
       throw reason;

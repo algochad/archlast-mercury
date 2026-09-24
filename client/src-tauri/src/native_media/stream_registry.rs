@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use paracord_transport::stream::{PublishedTrack, StreamId, TrackId, TrackSubscription};
+use mercury_transport::stream::{PublishedTrack, StreamId, TrackId, TrackSubscription};
 
 #[derive(Debug, Default, Clone)]
 pub struct StreamRegistry {
@@ -91,8 +91,8 @@ impl StreamRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use paracord_transport::control::TrackKind;
-    use paracord_transport::stream::{PublishedLayer, VideoCodec};
+    use mercury_transport::control::TrackKind;
+    use mercury_transport::stream::{PublishedLayer, VideoCodec};
 
     #[test]
     fn registry_tracks_publish_and_subscribe() {

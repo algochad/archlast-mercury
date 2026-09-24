@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { contentMentionsEveryone, mentionsEveryone } from './mentions';
 
 /**
- * `mention_everyone` is typed as a required boolean but no Paracord server
+ * `mention_everyone` is typed as a required boolean but no Archlast Mercury server
  * emits it — `build_message_json` never sets the field. Reading it directly
  * therefore evaluated to `undefined` for every real message, which is why
  * @everyone never highlighted and never produced a mention badge.
@@ -31,7 +31,7 @@ describe('contentMentionsEveryone', () => {
 
 describe('mentionsEveryone', () => {
   it('derives from content when the server omits the field', () => {
-    // This is the shape every real Paracord message has.
+    // This is the shape every real Archlast Mercury message has.
     expect(mentionsEveryone({ content: 'ship it @everyone' })).toBe(true);
     expect(mentionsEveryone({ content: 'ship it' })).toBe(false);
   });

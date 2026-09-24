@@ -453,7 +453,7 @@ export function InstanceSetupPage() {
           <header className="flex items-center gap-3">
             <AppMark size={34} />
             <h1 className="pc-display text-title text-text-primary">
-              Set up your Paracord instance
+              Set up your Archlast Mercury instance
             </h1>
           </header>
 
@@ -650,7 +650,7 @@ export function InstanceSetupPage() {
               dense
               progress={progress}
               title="Name the place"
-              description="Two names, and you can change both later. The first is for this whole Paracord — everyone who signs in here sees it. The second is for your first server: the place with channels where people actually talk. It starts with a #general channel and a voice channel."
+              description="Two names, and you can change both later. The first is for this whole Archlast Mercury — everyone who signs in here sees it. The second is for your first server: the place with channels where people actually talk. It starts with a #general channel and a voice channel."
             >
               <AuthScroll paired>
                 <Field

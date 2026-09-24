@@ -1,0 +1,935 @@
+use crate::error::CoreError;
+use crate::permissions;
+use crate::MESSAGE_FLAG_DM_E2EE;
+use mercury_db::DbPool;
+use mercury_models::permissions::Permissions;
+
+const MAX_DM_E2EE_NONCE_LEN: usize = 128;
+const MAX_DM_E2EE_CIPHERTEXT_LEN: usize = 16_384;
+const MAX_DM_E2EE_HEADER_LEN: usize = 2_048;
+
+#[derive(Debug, Clone)]
+pub struct DmE2eePayload {
+    pub version: u8,
+    pub nonce: String,
+    pub ciphertext: String,
+    /// Signal protocol header (JSON), present for v2 messages.
+    pub header: Option<String>,
+}
+
+impl DmE2eePayload {
+    fn validate(&self) -> Result<(), CoreError> {
+        match self.version {
+            1 => {
+                // v1: no header allowed
+                if self.header.is_some() {
+                    return Err(CoreError::BadRequest(
+                        "v1 DM E2EE payloads must not include a header".into(),
+                    ));
+                }
+            }
+            // v2 is the 1:1 Signal session; v3 is the group sender key. Both
+            // carry their routing in a JSON header the server never reads into:
+            // it checks only that the field is present, bounded and parseable,
+            // because everything it means is authenticated on the devices.
+            2 | 3 => {
+                let header = self.header.as_deref().ok_or_else(|| {
+                    CoreError::BadRequest("v2 and v3 DM E2EE payloads require a header".into())
+                })?;
+                if header.is_empty() || header.len() > MAX_DM_E2EE_HEADER_LEN {
+                    return Err(CoreError::BadRequest(
+                        "Invalid DM E2EE header length".into(),
+                    ));
+                }
+                if serde_json::from_str::<serde_json::Value>(header).is_err() {
+                    return Err(CoreError::BadRequest(
+                        "DM E2EE header must be valid JSON".into(),
+                    ));
+                }
+            }
+            _ => {
+                return Err(CoreError::BadRequest(
+                    "Unsupported DM E2EE payload version".into(),
+                ));
+            }
+        }
+        if self.nonce.is_empty() || self.nonce.len() > MAX_DM_E2EE_NONCE_LEN {
+            return Err(CoreError::BadRequest("Invalid DM E2EE nonce".into()));
+        }
+        if self.ciphertext.is_empty() || self.ciphertext.len() > MAX_DM_E2EE_CIPHERTEXT_LEN {
+            return Err(CoreError::BadRequest("Invalid DM E2EE ciphertext".into()));
+        }
+        let valid_base64_char = |c: char| {
+            c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || c == '-' || c == '_'
+        };
+        if !self.nonce.chars().all(valid_base64_char) {
+            return Err(CoreError::BadRequest("Invalid DM E2EE nonce".into()));
+        }
+        if !self.ciphertext.chars().all(valid_base64_char) {
+            return Err(CoreError::BadRequest("Invalid DM E2EE ciphertext".into()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateMessageOptions {
+    pub message_type: i16,
+    pub reference_id: Option<i64>,
+    pub allow_empty_content: bool,
+    pub dm_e2ee: Option<DmE2eePayload>,
+    pub nonce: Option<String>,
+}
+
+impl Default for CreateMessageOptions {
+    fn default() -> Self {
+        Self {
+            message_type: 0,
+            reference_id: None,
+            allow_empty_content: false,
+            dm_e2ee: None,
+            nonce: None,
+        }
+    }
+}
+
+/// Create a message, requires SEND_MESSAGES and VIEW_CHANNEL.
+pub async fn create_message(
+    pool: &DbPool,
+    msg_id: i64,
+    channel_id: i64,
+    author_id: i64,
+    content: &str,
+    reference_id: Option<i64>,
+) -> Result<mercury_db::messages::MessageRow, CoreError> {
+    create_message_with_options(
+        pool,
+        msg_id,
+        channel_id,
+        author_id,
+        content,
+        CreateMessageOptions {
+            message_type: 0,
+            reference_id,
+            allow_empty_content: false,
+            dm_e2ee: None,
+            nonce: None,
+        },
+    )
+    .await
+}
+
+/// Create a message with an explicit message type, requires SEND_MESSAGES and VIEW_CHANNEL.
+pub async fn create_message_with_type(
+    pool: &DbPool,
+    msg_id: i64,
+    channel_id: i64,
+    author_id: i64,
+    content: &str,
+    message_type: i16,
+    reference_id: Option<i64>,
+) -> Result<mercury_db::messages::MessageRow, CoreError> {
+    create_message_with_options(
+        pool,
+        msg_id,
+        channel_id,
+        author_id,
+        content,
+        CreateMessageOptions {
+            message_type,
+            reference_id,
+            allow_empty_content: false,
+            dm_e2ee: None,
+            nonce: None,
+        },
+    )
+    .await
+}
+
+/// Create a message with explicit options (message type, attachment-only allowance, DM E2EE payload).
+pub async fn create_message_with_options(
+    pool: &DbPool,
+    msg_id: i64,
+    channel_id: i64,
+    author_id: i64,
+    content: &str,
+    options: CreateMessageOptions,
+) -> Result<mercury_db::messages::MessageRow, CoreError> {
+    create_message_with_attention(pool, msg_id, channel_id, author_id, content, options)
+        .await
+        .map(|(message, _)| message)
+}
+
+/// Return the committed audience alongside the message for recipient-only events.
+pub async fn create_message_with_attention(
+    pool: &DbPool,
+    msg_id: i64,
+    channel_id: i64,
+    author_id: i64,
+    content: &str,
+    options: CreateMessageOptions,
+) -> Result<(mercury_db::messages::MessageRow, Vec<i64>), CoreError> {
+    let mut mentioned_users = Vec::new();
+    let mut stored_content = content.to_string();
+    let mut flags = 0_i32;
+    let mut nonce = options
+        .nonce
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    if let Some(candidate) = nonce.as_ref() {
+        if candidate.len() > 64 {
+            return Err(CoreError::BadRequest("Invalid message nonce".into()));
+        }
+    }
+
+    let delivery_nonce = nonce.clone();
+
+    let channel = mercury_db::channels::get_channel(pool, channel_id)
+        .await?
+        .ok_or(CoreError::NotFound)?;
+
+    // Check permissions if guild channel
+    if let Some(guild_id) = channel.guild_id() {
+        if options.dm_e2ee.is_some() {
+            return Err(CoreError::BadRequest(
+                "DM E2EE payloads are only valid for direct messages".into(),
+            ));
+        }
+        if !content.trim().is_empty() {
+            mercury_util::validation::validate_message_content(content).map_err(|_| {
+                CoreError::BadRequest("Content must be between 1 and 2000 characters".into())
+            })?;
+        } else if !options.allow_empty_content {
+            return Err(CoreError::BadRequest(
+                "Content must be between 1 and 2000 characters".into(),
+            ));
+        }
+
+        permissions::ensure_guild_member(pool, guild_id, author_id).await?;
+        if let Some(member) = mercury_db::members::get_member(pool, author_id, guild_id).await? {
+            if let Some(until) = member.communication_disabled_until {
+                if until > chrono::Utc::now() {
+                    return Err(CoreError::BadRequest(
+                        "You are timed out and cannot send messages".into(),
+                    ));
+                }
+            }
+        }
+        let guild = mercury_db::guilds::get_guild(pool, guild_id)
+            .await?
+            .ok_or(CoreError::NotFound)?;
+
+        let perms = permissions::compute_channel_permissions(
+            pool,
+            guild_id,
+            channel_id,
+            guild.owner_id,
+            author_id,
+        )
+        .await?;
+        permissions::require_permission(perms, Permissions::VIEW_CHANNEL)?;
+        permissions::require_permission(perms, Permissions::SEND_MESSAGES)?;
+        mentioned_users = resolve_message_mentions(
+            pool,
+            guild_id,
+            channel_id,
+            guild.owner_id,
+            author_id,
+            content,
+            perms.contains(Permissions::MENTION_EVERYONE),
+        )
+        .await?;
+
+        // A locked thread has to actually reject messages. Nothing read
+        // `thread_metadata` on the send path, so locking was purely cosmetic:
+        // the moderator saw the padlock, the members kept posting, and the
+        // audit log recorded a moderation action that did nothing. Moderators
+        // keep posting so they can close a thread out.
+        if channel.channel_type == permissions::CHANNEL_TYPE_THREAD {
+            let (archived, locked) = channel.thread_state();
+            let can_manage_thread = perms.contains(Permissions::MANAGE_MESSAGES)
+                || perms.contains(Permissions::MANAGE_CHANNELS);
+            if locked && !can_manage_thread {
+                return Err(CoreError::BadRequest(
+                    "This thread is locked and cannot receive new messages".into(),
+                ));
+            }
+            // Archiving is inactivity, not moderation: posting revives the
+            // thread, as it does everywhere else. Clear the flag so it reflects
+            // reality instead of staying set under an active conversation.
+            if archived {
+                mercury_db::channels::update_thread(pool, channel_id, None, Some(false), None)
+                    .await?;
+            }
+        }
+
+        // Enforce slowmode for non-admins, including optional per-role exemptions and adaptive
+        // slowmode settings.
+        let now = chrono::Utc::now();
+        let is_admin_bypass = perms.contains(Permissions::MANAGE_MESSAGES)
+            || perms.contains(Permissions::MANAGE_GUILD);
+        let feature_settings =
+            mercury_db::channel_features::get_or_default(pool, channel_id).await?;
+        let exempt_role_ids = mercury_db::channels::parse_required_role_ids(
+            &feature_settings.slowmode_exempt_role_ids,
+        );
+        let exempt_by_role = if exempt_role_ids.is_empty() {
+            false
+        } else {
+            let member_roles =
+                mercury_db::roles::get_member_roles(pool, author_id, guild_id).await?;
+            member_roles
+                .iter()
+                .any(|role| exempt_role_ids.contains(&role.id))
+        };
+
+        let mut effective_rate_limit = i64::from(channel.rate_limit_per_user.max(0));
+        if feature_settings.adaptive_slowmode_enabled {
+            let window_seconds =
+                i64::from(feature_settings.adaptive_slowmode_window_seconds.max(5));
+            let threshold = i64::from(feature_settings.adaptive_slowmode_threshold.max(1));
+            let step_seconds = i64::from(feature_settings.adaptive_slowmode_step_seconds.max(1));
+            let since = now - chrono::Duration::seconds(window_seconds);
+            let recent_count =
+                mercury_db::messages::count_channel_messages_since(pool, channel_id, since)
+                    .await?;
+            if recent_count >= threshold {
+                let overload = recent_count - threshold + 1;
+                let tiers = ((overload - 1) / threshold) + 1;
+                effective_rate_limit += tiers * step_seconds;
+            }
+        }
+
+        if effective_rate_limit > 0 && !is_admin_bypass && !exempt_by_role {
+            if let Some(last_sent) =
+                mercury_db::messages::get_last_user_message_time(pool, channel_id, author_id)
+                    .await?
+            {
+                let elapsed = now.signed_duration_since(last_sent).num_seconds();
+                if elapsed < effective_rate_limit {
+                    let retry_after = effective_rate_limit - elapsed;
+                    return Err(CoreError::RateLimited(retry_after));
+                }
+            }
+        }
+    } else {
+        if !mercury_db::dms::is_dm_recipient(pool, channel_id, author_id).await? {
+            return Err(CoreError::Forbidden);
+        }
+        let recipients = mercury_db::dms::get_dm_recipient_ids(pool, channel_id).await?;
+        for recipient_id in recipients {
+            if recipient_id == author_id {
+                continue;
+            }
+            if mercury_db::relationships::is_blocked_either_direction(
+                pool,
+                author_id,
+                recipient_id,
+            )
+            .await?
+            {
+                return Err(CoreError::Forbidden);
+            }
+        }
+
+        if let Some(dm_e2ee) = options.dm_e2ee.as_ref() {
+            dm_e2ee.validate()?;
+            if !content.trim().is_empty() {
+                return Err(CoreError::BadRequest(
+                    "Plaintext content is not allowed for encrypted DMs".into(),
+                ));
+            }
+            stored_content = dm_e2ee.ciphertext.clone();
+            nonce = Some(dm_e2ee.nonce.clone());
+            flags |= MESSAGE_FLAG_DM_E2EE;
+        } else if !content.trim().is_empty() {
+            return Err(CoreError::BadRequest(
+                "Plaintext DM messages are disabled; update your client for encrypted DMs".into(),
+            ));
+        } else if !options.allow_empty_content {
+            return Err(CoreError::BadRequest(
+                "Message content must be between 1 and 2000 characters".into(),
+            ));
+        }
+    }
+
+    let e2ee_header = options.dm_e2ee.as_ref().and_then(|p| p.header.clone());
+
+    let msg = mercury_db::messages::create_message_with_delivery_mentions(
+        pool,
+        msg_id,
+        channel_id,
+        author_id,
+        &stored_content,
+        options.message_type,
+        options.reference_id,
+        flags,
+        nonce.as_deref(),
+        e2ee_header.as_deref(),
+        delivery_nonce.as_deref(),
+        &mentioned_users,
+    )
+    .await?;
+
+    Ok((msg, mentioned_users))
+}
+
+/// Capture recipients while author permissions and membership are known. Later
+/// membership/role changes do not retarget an already delivered notification.
+pub(crate) async fn resolve_message_mentions(
+    pool: &DbPool,
+    guild_id: i64,
+    channel_id: i64,
+    owner_id: i64,
+    author_id: i64,
+    content: &str,
+    can_mention_all: bool,
+) -> Result<Vec<i64>, CoreError> {
+    use mercury_util::mentions::{contains_mass_mention, parse_mentions, parse_role_mentions};
+    let mut candidates: std::collections::BTreeSet<i64> =
+        parse_mentions(content).into_iter().collect();
+    let role_ids = parse_role_mentions(content);
+    if can_mention_all && contains_mass_mention(content) {
+        candidates.extend(mercury_db::members::get_guild_member_user_ids(pool, guild_id).await?);
+    }
+    candidates.extend(
+        mercury_db::roles::get_role_mention_recipients(pool, guild_id, &role_ids, can_mention_all)
+            .await?,
+    );
+    candidates.remove(&author_id);
+    let mut recipients = Vec::new();
+    for user_id in candidates {
+        if mercury_db::members::get_member(pool, user_id, guild_id)
+            .await?
+            .is_none()
+        {
+            continue;
+        }
+        let perms =
+            permissions::compute_channel_permissions(pool, guild_id, channel_id, owner_id, user_id)
+                .await?;
+        if perms.contains(Permissions::VIEW_CHANNEL) {
+            recipients.push(user_id);
+        }
+    }
+    Ok(recipients)
+}
+
+/// Edit a message. Only the author can edit, unless user has MANAGE_MESSAGES.
+pub async fn edit_message(
+    pool: &DbPool,
+    channel_id: i64,
+    message_id: i64,
+    user_id: i64,
+    content: &str,
+) -> Result<mercury_db::messages::MessageRow, CoreError> {
+    edit_message_with_options(pool, channel_id, message_id, user_id, content, None).await
+}
+
+/// Resolve current channel visibility and moderator authority. A successful
+/// receipt can be read after its target is gone, so visibility is independent
+/// of fetching that target. Authors must retain membership, including in DMs.
+async fn authorize_message_channel(
+    pool: &DbPool,
+    channel_id: i64,
+    user_id: i64,
+) -> Result<(mercury_db::channels::ChannelRow, bool), CoreError> {
+    let channel = mercury_db::channels::get_channel(pool, channel_id)
+        .await?
+        .ok_or(CoreError::NotFound)?;
+
+    // For the non-author (moderator) case, decide MANAGE_MESSAGES authority via
+    // compute_channel_permissions so channel permission overwrites are honored.
+    // Trusting base role bits here would let a role denied MANAGE_MESSAGES on this
+    // channel still mutate other users' messages.
+    let mut can_manage = false;
+
+    if let Some(guild_id) = channel.guild_id() {
+        // Authorization applies to the author too. Gating these checks on
+        // "editing someone else's message" let a kicked, banned or timed-out user
+        // with a still-valid session keep rewriting their own history and fan a
+        // MESSAGE_UPDATE out to the whole guild.
+        permissions::ensure_guild_member(pool, guild_id, user_id).await?;
+        let guild = mercury_db::guilds::get_guild(pool, guild_id)
+            .await?
+            .ok_or(CoreError::NotFound)?;
+        let perms = permissions::compute_channel_permissions(
+            pool,
+            guild_id,
+            channel_id,
+            guild.owner_id,
+            user_id,
+        )
+        .await?;
+        permissions::require_permission(perms, Permissions::VIEW_CHANNEL)?;
+        can_manage = perms.contains(Permissions::MANAGE_MESSAGES);
+    } else if !mercury_db::dms::is_dm_recipient(pool, channel_id, user_id).await? {
+        return Err(CoreError::Forbidden);
+    }
+    Ok((channel, can_manage))
+}
+
+/// Resolve a visible target without granting permission to mutate it.
+async fn authorize_message_edit_visibility(
+    pool: &DbPool,
+    channel_id: i64,
+    message_id: i64,
+    user_id: i64,
+) -> Result<(mercury_db::channels::ChannelRow, bool, i64), CoreError> {
+    let (channel, can_manage) = authorize_message_channel(pool, channel_id, user_id).await?;
+    let msg = mercury_db::messages::get_message(pool, message_id)
+        .await?
+        .ok_or(CoreError::NotFound)?;
+    if msg.channel_id != channel_id {
+        return Err(CoreError::NotFound);
+    }
+    Ok((channel, can_manage, msg.author_id))
+}
+
+/// Require current edit authority for a new mutation. Replays need only the
+/// originating actor's receipt and channel visibility, because they do not edit.
+pub async fn authorize_message_edit(
+    pool: &DbPool,
+    channel_id: i64,
+    message_id: i64,
+    user_id: i64,
+) -> Result<(mercury_db::channels::ChannelRow, bool), CoreError> {
+    let (channel, can_manage, author_id) =
+        authorize_message_edit_visibility(pool, channel_id, message_id, user_id).await?;
+    if let Some(guild_id) = channel.guild_id() {
+        if let Some(member) = mercury_db::members::get_member(pool, user_id, guild_id).await? {
+            if let Some(until) = member.communication_disabled_until {
+                if until > chrono::Utc::now() {
+                    return Err(CoreError::BadRequest(
+                        "You are timed out and cannot edit messages".into(),
+                    ));
+                }
+            }
+        }
+    }
+    if author_id != user_id && !can_manage {
+        return Err(if channel.guild_id().is_some() {
+            CoreError::MissingPermission
+        } else {
+            CoreError::Forbidden
+        });
+    }
+    Ok((channel, can_manage))
+}
+
+/// Edit a message with optional DM E2EE payload.
+pub async fn edit_message_with_options(
+    pool: &DbPool,
+    channel_id: i64,
+    message_id: i64,
+    user_id: i64,
+    content: &str,
+    dm_e2ee: Option<DmE2eePayload>,
+) -> Result<mercury_db::messages::MessageRow, CoreError> {
+    prepare_message_edit(pool, channel_id, message_id, user_id, content, dm_e2ee)
+        .await?
+        .apply(pool, None, &[])
+        .await
+        .map(|result| result.message)
+}
+
+pub struct PreparedMessageEdit {
+    pub channel: mercury_db::channels::ChannelRow,
+    message_id: i64,
+    actor_id: i64,
+    content: String,
+    nonce: Option<String>,
+    header: Option<String>,
+    flags: Option<i32>,
+}
+
+impl PreparedMessageEdit {
+    pub async fn replayed_message(
+        &self,
+        pool: &DbPool,
+        edit_nonce: &str,
+    ) -> Result<Option<mercury_db::messages::MessageRow>, CoreError> {
+        authorize_message_edit_visibility(pool, self.channel.id, self.message_id, self.actor_id)
+            .await?;
+        let Some(receipt) = mercury_db::messages::find_message_edit_receipt(
+            pool,
+            self.channel.id,
+            self.actor_id,
+            edit_nonce,
+        )
+        .await?
+        else {
+            return Ok(None);
+        };
+        let expected = mercury_db::messages::message_edit_request_hash(
+            self.message_id,
+            &self.content,
+            self.nonce.as_deref(),
+            self.header.as_deref(),
+            self.flags,
+        );
+        if receipt.message_id == self.message_id && receipt.cancelled != 0 {
+            return Err(mercury_db::DbError::EditCancelled.into());
+        }
+        if receipt.message_id != self.message_id || receipt.request_hash != expected {
+            return Err(CoreError::Conflict(
+                "This edit nonce was already used for a different request.".into(),
+            ));
+        }
+        Ok(Some(
+            mercury_db::messages::get_message(pool, self.message_id)
+                .await?
+                .ok_or(CoreError::NotFound)?,
+        ))
+    }
+
+    pub async fn apply(
+        self,
+        pool: &DbPool,
+        edit_nonce: Option<&str>,
+        hits: &[mercury_db::automod::AutomodHitRow],
+    ) -> Result<mercury_db::messages::MessageEditResult, CoreError> {
+        if let Some(nonce) = edit_nonce {
+            if let Some(message) = self.replayed_message(pool, nonce).await? {
+                return Ok(mercury_db::messages::MessageEditResult {
+                    message,
+                    replayed: true,
+                });
+            }
+        }
+        use mercury_models::id::{ChannelId, MessageId, UserId};
+        let (_, can_manage) =
+            authorize_message_edit(pool, self.channel.id, self.message_id, self.actor_id).await?;
+        mercury_db::messages::update_message_authorized_with_receipt(
+            pool,
+            MessageId::new(self.message_id),
+            ChannelId::new(self.channel.id),
+            UserId::new(self.actor_id),
+            &self.content,
+            self.nonce.as_deref(),
+            self.header.as_deref(),
+            self.flags,
+            can_manage,
+            edit_nonce,
+            hits,
+        )
+        .await?
+        .ok_or(CoreError::NotFound)
+    }
+}
+
+/// Validate under channel visibility. New mutations still require full edit authority.
+pub async fn prepare_message_edit(
+    pool: &DbPool,
+    channel_id: i64,
+    message_id: i64,
+    user_id: i64,
+    content: &str,
+    dm_e2ee: Option<DmE2eePayload>,
+) -> Result<PreparedMessageEdit, CoreError> {
+    let mut stored_content = content.to_string();
+    let mut nonce: Option<String> = None;
+    let mut flags: Option<i32> = None;
+
+    let (channel, _, _) =
+        authorize_message_edit_visibility(pool, channel_id, message_id, user_id).await?;
+    if channel.guild_id().is_some() {
+        if dm_e2ee.is_some() {
+            return Err(CoreError::BadRequest(
+                "DM E2EE payloads are only valid for direct messages".into(),
+            ));
+        }
+        mercury_util::validation::validate_message_content(content).map_err(|_| {
+            CoreError::BadRequest("Content must be between 1 and 2000 characters".into())
+        })?;
+    } else if let Some(payload) = dm_e2ee.as_ref() {
+        payload.validate()?;
+        if !content.trim().is_empty() {
+            return Err(CoreError::BadRequest(
+                "Plaintext content is not allowed for encrypted DMs".into(),
+            ));
+        }
+        stored_content = payload.ciphertext.clone();
+        nonce = Some(payload.nonce.clone());
+        flags = Some(MESSAGE_FLAG_DM_E2EE);
+    } else if !content.trim().is_empty() {
+        return Err(CoreError::BadRequest(
+            "Plaintext DM messages are disabled; update your client for encrypted DMs".into(),
+        ));
+    } else {
+        return Err(CoreError::BadRequest(
+            "Content must be between 1 and 2000 characters".into(),
+        ));
+    }
+
+    Ok(PreparedMessageEdit {
+        channel,
+        message_id,
+        actor_id: user_id,
+        content: stored_content,
+        nonce,
+        header: dm_e2ee.and_then(|payload| payload.header),
+        flags,
+    })
+}
+
+/// Delete a message. Author can delete own, or MANAGE_MESSAGES can delete any.
+pub async fn delete_message(
+    pool: &DbPool,
+    message_id: i64,
+    channel_id: i64,
+    user_id: i64,
+) -> Result<(), CoreError> {
+    delete_message_with_receipt(pool, message_id, channel_id, user_id, None, false).await?;
+    Ok(())
+}
+
+/// Replay proves only this actor's earlier deletion. New deletions and pending
+/// resolutions require current target authority; all paths require visibility.
+pub async fn delete_message_with_receipt(
+    pool: &DbPool,
+    message_id: i64,
+    channel_id: i64,
+    user_id: i64,
+    delete_nonce: Option<&str>,
+    resolve_only: bool,
+) -> Result<
+    (
+        mercury_db::channels::ChannelRow,
+        mercury_db::messages::MessageDeletionResult,
+    ),
+    CoreError,
+> {
+    let (channel, can_manage) = authorize_message_channel(pool, channel_id, user_id).await?;
+    let result = mercury_db::messages::delete_message_with_receipt(
+        pool,
+        message_id,
+        channel_id,
+        user_id,
+        can_manage,
+        delete_nonce,
+        resolve_only,
+    )
+    .await?;
+    use mercury_db::messages::MessageDeletionResult;
+    match result {
+        MessageDeletionResult::Missing => Err(CoreError::NotFound),
+        MessageDeletionResult::Forbidden => Err(if channel.guild_id().is_some() {
+            CoreError::MissingPermission
+        } else {
+            CoreError::Forbidden
+        }),
+        _ => Ok((channel, result)),
+    }
+}
+
+/// Attach a single committed channel snapshot to message events. Its revision
+/// orders activity independently of message IDs and event publication order.
+pub async fn prepare_message_event(
+    pool: &DbPool,
+    channel_id: i64,
+    mut payload: serde_json::Value,
+) -> Result<serde_json::Value, CoreError> {
+    let channel = mercury_db::channels::get_channel(pool, channel_id)
+        .await?
+        .ok_or(CoreError::NotFound)?;
+    let object = payload
+        .as_object_mut()
+        .ok_or_else(|| CoreError::Internal("Message event must be an object".into()))?;
+    object.insert(
+        "channel_activity".into(),
+        serde_json::json!({
+            "channel_id": channel_id.to_string(),
+            "last_message_id": channel.last_message_id.map(|id| id.to_string()),
+            "revision": channel.message_revision.to_string(),
+        "guild_id": channel.guild_id().map(|id| id.to_string()),
+        }),
+    );
+    Ok(payload)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn payload(version: u8, header: Option<&str>) -> DmE2eePayload {
+        DmE2eePayload {
+            version,
+            nonce: "bm9uY2U=".into(),
+            ciphertext: "Y2lwaGVydGV4dA==".into(),
+            header: header.map(str::to_string),
+        }
+    }
+
+    /// The group sender-key payload is a third version, not a malformed second.
+    ///
+    /// Rejecting it here is invisible from the client's crypto tests — they only
+    /// ever see their own output — and shows up as a message that composes,
+    /// queues and is then refused by the instance.
+    #[test]
+    fn group_sender_key_payload_version_is_accepted() {
+        let header = r#"{"kind":"group_sender_key","v":3,"sender_id":"1","epoch":0,"members":"ab","sig":"c2ln"}"#;
+        payload(3, Some(header)).validate().unwrap();
+    }
+
+    #[test]
+    fn a_v3_payload_still_needs_a_parseable_header() {
+        assert!(matches!(
+            payload(3, None).validate(),
+            Err(CoreError::BadRequest(_))
+        ));
+        assert!(matches!(
+            payload(3, Some("not json")).validate(),
+            Err(CoreError::BadRequest(_))
+        ));
+    }
+
+    #[test]
+    fn unknown_payload_versions_are_still_refused() {
+        assert!(matches!(
+            payload(4, Some("{}")).validate(),
+            Err(CoreError::BadRequest(_))
+        ));
+        assert!(matches!(
+            payload(0, None).validate(),
+            Err(CoreError::BadRequest(_))
+        ));
+    }
+
+    const GUILD_ID: i64 = 100;
+    const OWNER_ID: i64 = 1;
+    const AUTHOR_ID: i64 = 7;
+    const ROLE_ID: i64 = 300;
+    const CHANNEL_ID: i64 = 500;
+    const MESSAGE_ID: i64 = 800;
+
+    /// Guild with one channel and one member (`AUTHOR_ID`) who has already posted
+    /// `MESSAGE_ID`.
+    async fn seed_authored_message() -> DbPool {
+        let pool = mercury_db::create_pool("sqlite::memory:", 1)
+            .await
+            .expect("create in-memory pool");
+        mercury_db::run_migrations(&pool)
+            .await
+            .expect("run migrations");
+
+        mercury_db::users::create_user(&pool, OWNER_ID, "owner", 1, "owner@x", "h")
+            .await
+            .unwrap();
+        mercury_db::users::create_user(&pool, AUTHOR_ID, "author", 2, "author@x", "h")
+            .await
+            .unwrap();
+        mercury_db::guilds::create_guild(&pool, GUILD_ID, "g", OWNER_ID, None)
+            .await
+            .unwrap();
+        mercury_db::members::add_member(&pool, AUTHOR_ID, GUILD_ID)
+            .await
+            .unwrap();
+        mercury_db::roles::create_role(
+            &pool,
+            ROLE_ID,
+            GUILD_ID,
+            "member",
+            (Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES).bits(),
+        )
+        .await
+        .unwrap();
+        mercury_db::roles::add_member_role(&pool, AUTHOR_ID, GUILD_ID, ROLE_ID)
+            .await
+            .unwrap();
+        mercury_db::channels::create_channel(
+            &pool, CHANNEL_ID, GUILD_ID, "general", 0, 0, None, None,
+        )
+        .await
+        .unwrap();
+        mercury_db::messages::create_message(
+            &pool, MESSAGE_ID, CHANNEL_ID, AUTHOR_ID, "original", 0, None,
+        )
+        .await
+        .unwrap();
+        pool
+    }
+
+    async fn stored_content(pool: &DbPool) -> Option<String> {
+        mercury_db::messages::get_message(pool, MESSAGE_ID)
+            .await
+            .unwrap()
+            .and_then(|m| m.content)
+    }
+
+    #[tokio::test]
+    async fn author_can_edit_and_delete_own_message() {
+        let pool = seed_authored_message().await;
+        let updated = edit_message(&pool, CHANNEL_ID, MESSAGE_ID, AUTHOR_ID, "edited")
+            .await
+            .unwrap();
+        assert_eq!(updated.content.as_deref(), Some("edited"));
+        delete_message(&pool, MESSAGE_ID, CHANNEL_ID, AUTHOR_ID)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn kicked_author_cannot_edit_or_delete() {
+        let pool = seed_authored_message().await;
+        // A kick or ban removes the member row, but the session token stays valid
+        // until it expires, so authorization has to be re-checked on every
+        // mutation -- including the author's own.
+        mercury_db::members::remove_member(&pool, AUTHOR_ID, GUILD_ID)
+            .await
+            .unwrap();
+
+        let edit = edit_message(&pool, CHANNEL_ID, MESSAGE_ID, AUTHOR_ID, "edited").await;
+        assert!(matches!(edit, Err(CoreError::Forbidden)));
+        assert_eq!(stored_content(&pool).await.as_deref(), Some("original"));
+
+        let delete = delete_message(&pool, MESSAGE_ID, CHANNEL_ID, AUTHOR_ID).await;
+        assert!(matches!(delete, Err(CoreError::Forbidden)));
+        assert!(mercury_db::messages::get_message(&pool, MESSAGE_ID)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
+    #[tokio::test]
+    async fn author_denied_view_channel_cannot_edit_or_delete() {
+        let pool = seed_authored_message().await;
+        mercury_db::channel_overwrites::upsert_channel_overwrite(
+            &pool,
+            CHANNEL_ID,
+            ROLE_ID,
+            permissions::OVERWRITE_TARGET_ROLE,
+            Permissions::empty().bits(),
+            Permissions::VIEW_CHANNEL.bits(),
+        )
+        .await
+        .unwrap();
+
+        let edit = edit_message(&pool, CHANNEL_ID, MESSAGE_ID, AUTHOR_ID, "edited").await;
+        assert!(matches!(edit, Err(CoreError::MissingPermission)));
+        assert_eq!(stored_content(&pool).await.as_deref(), Some("original"));
+
+        let delete = delete_message(&pool, MESSAGE_ID, CHANNEL_ID, AUTHOR_ID).await;
+        assert!(matches!(delete, Err(CoreError::MissingPermission)));
+    }
+
+    #[tokio::test]
+    async fn timed_out_author_cannot_edit_but_can_delete() {
+        let pool = seed_authored_message().await;
+        let until = chrono::Utc::now() + chrono::Duration::hours(1);
+        mercury_db::members::set_member_timeout(&pool, AUTHOR_ID, GUILD_ID, Some(until))
+            .await
+            .unwrap();
+
+        let edit = edit_message(&pool, CHANNEL_ID, MESSAGE_ID, AUTHOR_ID, "edited").await;
+        assert!(matches!(edit, Err(CoreError::BadRequest(_))));
+        assert_eq!(stored_content(&pool).await.as_deref(), Some("original"));
+
+        // A timeout silences the member; it does not freeze their existing posts.
+        delete_message(&pool, MESSAGE_ID, CHANNEL_ID, AUTHOR_ID)
+            .await
+            .unwrap();
+    }
+}

@@ -1,4 +1,4 @@
-# Paracord Layout Spec — "Channels + Unified Stream" (v1.0 overhaul)
+# Archlast Mercury Layout Spec — "Channels + Unified Stream" (v1.0 overhaul)
 
 > **Status: SHIPPED (v1.0).** All four migration waves in §8 have landed on
 > `overhaul/v1.0-shippable`. The Discord skeleton (`Sidebar` / `ChannelSidebar` /
@@ -273,7 +273,7 @@ flag is live-accurate but lost on refresh, so it is deferred, not faked.
 
 ### 3.4 Pinning persistence — `stores/pinnedStore.ts`
 
-`zustand` + `persist` (folderStore pattern), storage key `paracord:pinned-conversations`.
+`zustand` + `persist` (folderStore pattern), storage key `mercury:pinned-conversations`.
 State: `{ pinnedKeys: string[]; pin(key); unpin(key); reorder(keys) }`. Keys are the composite
 `${serverId}:${channelId}` so pins survive across servers and reconnects. `PinnedRail` renders
 in `pinnedKeys` order.
@@ -501,7 +501,7 @@ old pages working while the new shell renders new components.
     (`GuildHomeHeader` + `InvitePage`), voice control bar (`CallDock` desktop +
     `MiniVoiceBar` mobile), stage + streams/watch (`RoomCard` states → channel route),
     developer surfaces (route + ⌘K). Gate: `npm run typecheck` + `npm run test:unit`
-    (867 pass) + `npm run test:e2e` (mocked smoke) + `PARACORD_E2E_REAL=1` real-server
+    (867 pass) + `npm run test:e2e` (mocked smoke) + `MERCURY_E2E_REAL=1` real-server
     smoke + `cargo check --workspace` all green; server tree untouched (client-only).
 
 ---

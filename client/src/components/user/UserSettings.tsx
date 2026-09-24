@@ -1504,7 +1504,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
               <div>
                 <SettingsHeader
                   title="Appearance"
-                  description="Tune the look and density of Paracord to match how you read."
+                  description="Tune the look and density of Archlast Mercury to match how you read."
                 />
                 <section>
                   <ThemeSelector currentTheme={theme} onThemeChange={(t) => handleThemeChange(t)} />
@@ -1719,7 +1719,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
                     {systemAudioGrant.required ? (
                       <>
                         <p className="mt-2 max-w-xl text-body text-text-secondary">
-                          When you stream with desktop audio, Paracord records the sound of every
+                          When you stream with desktop audio, Archlast Mercury records the sound of every
                           other application on this computer and shares it in the call. It asks for
                           this once and remembers the answer, so starting a stream never stops to
                           ask again.
@@ -1728,7 +1728,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
                           <span className="text-body text-text-primary">
                             {systemAudioGrant.granted
                               ? 'This computer is allowed to share its own sound.'
-                              : 'Paracord will ask the first time you stream with desktop audio.'}
+                              : 'Archlast Mercury will ask the first time you stream with desktop audio.'}
                           </span>
                           {systemAudioGrant.granted && (
                             <Button
@@ -1748,7 +1748,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
                       <p className="mt-2 max-w-xl text-body text-text-secondary">
                         Desktop audio is granted by the screen-sharing window your desktop shows
                         when you start a stream — that choice is the permission, and it is not
-                        Paracord&rsquo;s to keep or revoke. There is nothing to manage here.
+                        Archlast Mercury&rsquo;s to keep or revoke. There is nothing to manage here.
                       </p>
                     )}
                   </section>
@@ -1795,7 +1795,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
               <div>
                 <SettingsHeader
                   title="Notifications"
-                  description="Decide when Paracord should reach out and how loud it gets."
+                  description="Decide when Archlast Mercury should reach out and how loud it gets."
                 />
                 <section>
                   <div className="divide-y divide-border-subtle">
@@ -1857,7 +1857,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
               <div>
                 <SettingsHeader
                   title="Activity privacy"
-                  description="Control what Paracord shares about the apps and games you use."
+                  description="Control what Archlast Mercury shares about the apps and games you use."
                 />
                 <section>
                   <div className="divide-y divide-border-subtle">
@@ -1873,7 +1873,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
                 <section className="mt-9 border-t border-border-subtle pt-8">
                   <h3 className="text-section text-text-muted">Detected apps</h3>
                   <p className="mt-2 max-w-xl text-body text-text-secondary">
-                    Turn off any app you'd rather keep private. Paracord stops reporting it right away.
+                    Turn off any app you'd rather keep private. Archlast Mercury stops reporting it right away.
                   </p>
                   {visibleKnownActivityApps.length === 0 ? (
                     <Well className="mt-4 flex items-start gap-3 px-4 py-4">
@@ -1882,10 +1882,10 @@ export function UserSettings({ onClose }: UserSettingsProps) {
                       </div>
                       <div className="min-w-0">
                         <div className="text-label text-text-primary">
-                          Paracord hasn't seen you in another app yet
+                          Archlast Mercury hasn't seen you in another app yet
                         </div>
                         <p className="mt-0.5 text-meta leading-relaxed text-text-secondary">
-                          Launch a game or app while Paracord is open and it'll appear here to manage.
+                          Launch a game or app while Archlast Mercury is open and it'll appear here to manage.
                         </p>
                       </div>
                     </Well>
@@ -1974,7 +1974,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
               <div>
                 <SettingsHeader
                   title="Identity portability"
-                  description="Verify your key, or move your identity between Paracord instances."
+                  description="Verify your key, or move your identity between Archlast Mercury instances."
                 />
 
                 {identityStatus && (
@@ -2011,7 +2011,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
                 <section className="mt-9 border-t border-border-subtle pt-8">
                   <h3 className="text-section text-text-muted">Export identity</h3>
                   <p className="mt-2 max-w-xl text-body text-text-secondary">
-                    Download a signed bundle you can import into another Paracord instance.
+                    Download a signed bundle you can import into another Archlast Mercury instance.
                   </p>
                   <div className="mt-2 divide-y divide-border-subtle">
                     <ToggleRow
@@ -2093,7 +2093,7 @@ export function UserSettings({ onClose }: UserSettingsProps) {
               <div>
                 <SettingsHeader
                   title="Instance"
-                  description="Administrative controls for this Paracord instance."
+                  description="Administrative controls for this Archlast Mercury instance."
                 />
                 <section>
                   <div className="rounded-[var(--radius-well)] bg-warning-tint shadow-[var(--shadow-well)] p-5">

@@ -1,6 +1,6 @@
 # Shared wire contracts
 
-`crates/paracord-contracts` holds the Rust types serialized by contracted HTTP
+`crates/mercury-contracts` holds the Rust types serialized by contracted HTTP
 handlers and gateway metadata projections. Database rows, READY and HTTP detail
 have distinct contracts. Do not describe a partial READY object as a full HTTP
 detail.
@@ -17,7 +17,7 @@ standalone validators into `client/src/api/generated/`. To verify the Rust side
 without modifying files, run from the repository root:
 
 ```sh
-cargo run --locked -p paracord-contracts --bin export-contracts -- --check contracts/api-contracts.json
+cargo run --locked -p mercury-contracts --bin export-contracts -- --check contracts/api-contracts.json
 ```
 
 CI checks both sides. Do not edit generated files or add client default values to

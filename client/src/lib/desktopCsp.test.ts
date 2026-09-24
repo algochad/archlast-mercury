@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * D8. The desktop shell's Content-Security-Policy allowed images from `https:`
  * but not `http:`, and that was the first thing anyone noticed about the
- * broken avatars: Paracord is self-hosted, a self-hosted server on a LAN is
+ * broken avatars: Archlast Mercury is self-hosted, a self-hosted server on a LAN is
  * routinely plain HTTP, and the webview's page origin is `tauri://localhost`,
  * so every avatar and custom emoji is a cross-origin load at the user's own
  * server. Adding `http:` did make the request leave the process.
@@ -46,7 +46,7 @@ describe('desktop Content-Security-Policy', () => {
     // — avatars, custom emoji, stickers, attachment previews.
     expect(imgSrc).toEqual(expect.arrayContaining(["'self'", 'data:', 'blob:']));
     // `https:` is for the open web: link-preview and embed artwork, GIF
-    // search results. Nothing Paracord authenticates is loaded this way.
+    // search results. Nothing Archlast Mercury authenticates is loaded this way.
     expect(imgSrc).toContain('https:');
     // If this ever comes back, something has started asking the webview to
     // fetch a server resource again — which cannot work on a self-signed

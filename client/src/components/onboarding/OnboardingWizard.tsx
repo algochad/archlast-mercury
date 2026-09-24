@@ -49,13 +49,13 @@ function FeatureList({ rows }: { rows: FeatureRow[] }) {
 
 const STEPS = [
   {
-    title: 'Welcome to Paracord',
+    title: 'Welcome to Archlast Mercury',
     subtitle: 'A self-hosted, decentralized place for your people',
     icon: Globe,
     content: (
       <>
         <p className="text-body text-text-secondary">
-          Unlike centralized platforms, Paracord gives you{' '}
+          Unlike centralized platforms, Archlast Mercury gives you{' '}
           <strong className="font-semibold text-text-primary">full control</strong> over your
           conversations. Your data lives on instances that you or your community operate.
         </p>
@@ -88,7 +88,7 @@ const STEPS = [
     content: (
       <>
         <p className="text-body text-text-secondary">
-          Paracord has no central company server. Every community runs on a computer that belongs
+          Archlast Mercury has no central company server. Every community runs on a computer that belongs
           to somebody in it.
         </p>
         <div className="pc-well px-3.5 py-1">

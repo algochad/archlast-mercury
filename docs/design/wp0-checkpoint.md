@@ -205,8 +205,8 @@ themes, at §9's floors (body ≥ 7:1, meta ≥ 4.5:1, white-light ink ≥ 12:1)
 ### Screenshots
 
 ```bash
-PARACORD_E2E_DESIGN=1 npx playwright test        # → output/design-reference/wp0/ (gitignored)
-PARACORD_E2E_DESIGN_WP=wp1 PARACORD_E2E_DESIGN=1 npx playwright test   # later packages
+MERCURY_E2E_DESIGN=1 npx playwright test        # → output/design-reference/wp0/ (gitignored)
+MERCURY_E2E_DESIGN_WP=wp1 MERCURY_E2E_DESIGN=1 npx playwright test   # later packages
 ```
 
 `client/e2e/design-review.spec.ts` is mocked exactly like the smoke and is gated

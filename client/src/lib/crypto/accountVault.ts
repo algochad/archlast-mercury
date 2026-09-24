@@ -44,7 +44,7 @@ function openDatabase(name = DATABASE): Promise<IDBDatabase> {
       operation.result.createObjectStore(STORE, { keyPath: 'address' });
     };
     operation.onerror = () => reject(operation.error ?? new Error('Encrypted storage could not be opened.'));
-    operation.onblocked = () => { blocked = true; reject(new Error('Close other Paracord windows to upgrade encrypted storage.')); };
+    operation.onblocked = () => { blocked = true; reject(new Error('Close other Archlast Mercury windows to upgrade encrypted storage.')); };
     operation.onsuccess = () => { if (blocked) operation.result.close(); else resolve(operation.result); };
   });
 }

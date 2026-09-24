@@ -28,7 +28,7 @@ state looks wrong on that page, the model is wrong, not the component.
 | `client/src/hooks/useRoomThumbnail.ts` | Wires one channel's thumbnail to the tap. |
 | `client/src/components/light/` | The components + `index.ts` barrel. |
 | `client/src/pages/DesignTokensPage.tsx` | The `Light components` section. |
-| `client/e2e/design-review.spec.ts` | `PARACORD_E2E_DESIGN_WP=wp1` capture path. |
+| `client/e2e/design-review.spec.ts` | `MERCURY_E2E_DESIGN_WP=wp1` capture path. |
 
 Nothing in `lib/attention/` imports a store or React. Nothing in
 `components/light/` reads a store. The hooks are the only join.
@@ -322,7 +322,7 @@ WP1's own tests:
 ### Screenshots
 
 ```bash
-PARACORD_E2E_DESIGN=1 PARACORD_E2E_DESIGN_WP=wp1 npx playwright test e2e/design-review.spec.ts
+MERCURY_E2E_DESIGN=1 MERCURY_E2E_DESIGN_WP=wp1 npx playwright test e2e/design-review.spec.ts
 # → output/design-reference/wp1/ (gitignored)
 ```
 

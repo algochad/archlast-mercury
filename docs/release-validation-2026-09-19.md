@@ -77,11 +77,11 @@ Later topology, quota, gateway, and embedded-client changes require a new final 
 Local packages created during diagnosis carry the previous 3.0.0 version and are **not**
 release deliverables.
 
-Evidence is retained outside the repository at `/tmp/paracord-release-20260919/` in
+Evidence is retained outside the repository at `/tmp/mercury-release-20260919/` in
 `root`, `authz`, `federation`, and `media` directories. Logs and manifests identify
 commands, fixture scope, executable hashes, screenshots, results, and failures.
 Earlier security evidence is at
-`/tmp/paracord-security-audit-2026-09-19-i778h33b/evidence/`.
+`/tmp/mercury-security-audit-2026-09-19-i778h33b/evidence/`.
 
 The CachyOS host's bundled linuxdeploy strip tool does not understand newer RELR
 sections. Local bundling succeeded with `NO_STRIP=1`; this retains symbols and does

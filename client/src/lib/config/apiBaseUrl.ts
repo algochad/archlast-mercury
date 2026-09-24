@@ -82,7 +82,7 @@ export function getStoredServerUrl(): string | null {
 
 /**
  * Returns the current browser origin as a server URL when running from a
- * deployed Paracord server. Skips local dev to avoid pinning Vite origins.
+ * deployed Archlast Mercury server. Skips local dev to avoid pinning Vite origins.
  */
 export function getCurrentOriginServerUrl(): string | null {
   if (typeof window === 'undefined') return null;

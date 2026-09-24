@@ -128,16 +128,16 @@ export function checkSecureContext(env: DiagnosticEnvironmentFacts): StepOutcome
     return {
       status: 'pass',
       code: 'SECURE_CONTEXT_OK',
-      summary: `Paracord is open on ${env.protocol}//${env.host}, which browsers treat as a secure origin.`,
+      summary: `Archlast Mercury is open on ${env.protocol}//${env.host}, which browsers treat as a secure origin.`,
       detail: { protocol: env.protocol, host: env.host },
     };
   }
   return {
     status: 'fail',
     code: 'SECURE_CONTEXT_INSECURE',
-    summary: `Paracord is open on ${env.protocol}//${env.host}, which this browser treats as insecure.`,
+    summary: `Archlast Mercury is open on ${env.protocol}//${env.host}, which this browser treats as insecure.`,
     remedy:
-      'Open Paracord over https://, or over http://localhost on the same machine as the server. Browsers block microphone access and QUIC media on insecure origins, so no call can start from this address.',
+      'Open Archlast Mercury over https://, or over http://localhost on the same machine as the server. Browsers block microphone access and QUIC media on insecure origins, so no call can start from this address.',
     detail: { protocol: env.protocol, host: env.host },
   };
 }
@@ -174,9 +174,9 @@ export function checkPlatform(env: DiagnosticEnvironmentFacts, facts: PlatformFa
     return {
       status: 'fail',
       code: 'PLATFORM_NO_WEBTRANSPORT',
-      summary: 'This browser cannot open a WebTransport connection, which Paracord uses to carry voice and video.',
+      summary: 'This browser cannot open a WebTransport connection, which Archlast Mercury uses to carry voice and video.',
       remedy:
-        'Use Chrome or Edge (or the Paracord desktop app) for calls. Safari has no WebTransport support, and Firefox does not yet support the certificate pinning a self-hosted server needs.',
+        'Use Chrome or Edge (or the Archlast Mercury desktop app) for calls. Safari has no WebTransport support, and Firefox does not yet support the certificate pinning a self-hosted server needs.',
       detail,
     };
   }
@@ -184,7 +184,7 @@ export function checkPlatform(env: DiagnosticEnvironmentFacts, facts: PlatformFa
     return {
       status: 'fail',
       code: 'PLATFORM_NO_MEDIA_DEVICES',
-      summary: 'This browser exposes no microphone or camera API, so Paracord cannot capture audio here.',
+      summary: 'This browser exposes no microphone or camera API, so Archlast Mercury cannot capture audio here.',
       remedy:
         'Update the browser, and check that a policy or extension is not blocking media capture on this site.',
       detail,
@@ -194,8 +194,8 @@ export function checkPlatform(env: DiagnosticEnvironmentFacts, facts: PlatformFa
     return {
       status: 'fail',
       code: 'PLATFORM_NO_OPUS',
-      summary: 'This browser cannot encode Opus audio, which every Paracord call uses.',
-      remedy: 'Use Chrome or Edge (or the Paracord desktop app) for calls on this server.',
+      summary: 'This browser cannot encode Opus audio, which every Archlast Mercury call uses.',
+      remedy: 'Use Chrome or Edge (or the Archlast Mercury desktop app) for calls on this server.',
       detail,
     };
   }
@@ -214,7 +214,7 @@ export function checkPlatform(env: DiagnosticEnvironmentFacts, facts: PlatformFa
       status: 'warn',
       code: 'PLATFORM_NO_VP9',
       summary: 'This browser cannot decode VP9 video, so voice will work but other people’s video and screen shares will not appear.',
-      remedy: 'Use Chrome or Edge (or the Paracord desktop app) to see video and screen shares.',
+      remedy: 'Use Chrome or Edge (or the Archlast Mercury desktop app) to see video and screen shares.',
       detail,
     };
   }
@@ -283,7 +283,7 @@ function transportOutcomeToStep(
         code: 'TRANSPORT_CERTIFICATE_REFUSED',
         summary: `The media port answered, but this browser refused the certificate it presented.`,
         remedy:
-          'The media port presents a certificate the server generates for itself, and this check pinned the fingerprint the server published moments ago. If that fingerprint was refused, this browser cannot pin a self-signed WebTransport certificate at all — Firefox and Safari cannot — so use a Chromium-based browser or the Paracord desktop app. If you are already in Chrome or Edge, re-run the check: the server rotates its media certificate, and a fingerprint read before a rotation is refused until it is read again.',
+          'The media port presents a certificate the server generates for itself, and this check pinned the fingerprint the server published moments ago. If that fingerprint was refused, this browser cannot pin a self-signed WebTransport certificate at all — Firefox and Safari cannot — so use a Chromium-based browser or the Archlast Mercury desktop app. If you are already in Chrome or Edge, re-run the check: the server rotates its media certificate, and a fingerprint read before a rotation is refused until it is read again.',
         detail,
       };
     case 'handshake-failed':
@@ -296,8 +296,8 @@ function transportOutcomeToStep(
         // for 13 days and rotated, which is inside the window browsers accept.
         summary: `The QUIC handshake with ${endpoint} did not complete, so no voice traffic can flow.`,
         remedy: config.certificatePinSha256
-          ? `The route is the likely cause: ${portText} must be published on the same host that serves chat and reach the Paracord instance itself rather than another service, and nothing between this device and the instance may drop UDP. If the instance is on this machine or your own network, re-run this check first — the instance rotates its media certificate, and a fingerprint read before a rotation is refused until it is read again.`
-          : `Ask the operator to confirm ${portText} is published on the same host that serves chat and reaches the Paracord instance itself rather than another service, and that the instance's media listener started without errors. If it is, something between this device and the instance is dropping UDP.`,
+          ? `The route is the likely cause: ${portText} must be published on the same host that serves chat and reach the Archlast Mercury instance itself rather than another service, and nothing between this device and the instance may drop UDP. If the instance is on this machine or your own network, re-run this check first — the instance rotates its media certificate, and a fingerprint read before a rotation is refused until it is read again.`
+          : `Ask the operator to confirm ${portText} is published on the same host that serves chat and reaches the Archlast Mercury instance itself rather than another service, and that the instance's media listener started without errors. If it is, something between this device and the instance is dropping UDP.`,
         detail,
       };
     case 'closed-early':
@@ -321,7 +321,7 @@ function transportOutcomeToStep(
         status: 'fail',
         code: 'TRANSPORT_UNSUPPORTED',
         summary: 'This runtime has no WebTransport support, so no media connection can be attempted.',
-        remedy: 'Use Chrome or Edge, or the Paracord desktop app.',
+        remedy: 'Use Chrome or Edge, or the Archlast Mercury desktop app.',
         detail,
       };
     default:
@@ -440,7 +440,7 @@ export async function runVoiceConnectionCheck(
         code: 'MIC_DENIED',
         summary: 'Microphone access is blocked for this site.',
         remedy:
-          'Open the padlock (or site settings) in the address bar, allow the microphone, then reload Paracord and run the check again.',
+          'Open the padlock (or site settings) in the address bar, allow the microphone, then reload Archlast Mercury and run the check again.',
         detail: { permission },
       };
     }
@@ -525,7 +525,7 @@ export async function runVoiceConnectionCheck(
         return {
           status: 'fail',
           code: 'MIC_IN_USE',
-          summary: 'Another application is holding the microphone, so Paracord could not open it.',
+          summary: 'Another application is holding the microphone, so Archlast Mercury could not open it.',
           remedy: 'Close the other app using the microphone (or end its call), then run the check again.',
           detail,
         };
@@ -587,7 +587,7 @@ export async function runVoiceConnectionCheck(
           summary:
             'You heard the tone, but this browser cannot send audio to a specific output, so it played on the system default device.',
           remedy:
-            'Choose your preferred device as the system default output, or use the Paracord desktop app, which switches outputs directly.',
+            'Choose your preferred device as the system default output, or use the Archlast Mercury desktop app, which switches outputs directly.',
           detail,
         };
       }
@@ -722,7 +722,7 @@ export async function runVoiceConnectionCheck(
         return {
           status: 'pass',
           code: 'MEDIA_CONFIG_LIVEKIT',
-          summary: 'This server routes calls through LiveKit over WebRTC rather than Paracord’s native QUIC path.',
+          summary: 'This server routes calls through LiveKit over WebRTC rather than Archlast Mercury’s native QUIC path.',
           detail,
         };
       }
@@ -740,7 +740,7 @@ export async function runVoiceConnectionCheck(
         code: invalid ? 'MEDIA_CONFIG_INVALID' : 'MEDIA_CONFIG_UNREACHABLE',
         summary: invalid
           ? 'The server answered with call settings this client does not understand.'
-          : 'Paracord could not ask the server which call transport it uses.',
+          : 'Archlast Mercury could not ask the server which call transport it uses.',
         remedy: invalid
           ? 'The server and this client are running incompatible versions. Ask the operator which version is deployed.'
           : 'Check that you are still signed in and that the server is reachable, then run the check again.',
@@ -755,7 +755,7 @@ export async function runVoiceConnectionCheck(
     if (!config || config.transport !== 'native') {
       return skipped(
         'SKIPPED_NOT_APPLICABLE',
-        'Skipped: this server does not use Paracord’s own QUIC media endpoint, so there is no media certificate to pin.',
+        'Skipped: this server does not use Archlast Mercury’s own QUIC media endpoint, so there is no media certificate to pin.',
       );
     }
     const pin = config.certificatePinSha256;
@@ -782,7 +782,7 @@ export async function runVoiceConnectionCheck(
         code: 'CERTIFICATE_PIN_MALFORMED',
         summary: 'The server published a media certificate fingerprint this client cannot read.',
         remedy:
-          'The fingerprint must be a base64 SHA-256 digest. Ask the operator which Paracord version the server runs; this is a server-side defect, not a network problem.',
+          'The fingerprint must be a base64 SHA-256 digest. Ask the operator which Archlast Mercury version the server runs; this is a server-side defect, not a network problem.',
         detail: { certificate_source: config.certificateSource, fingerprint_bytes: pinBytes },
       };
     }
@@ -791,9 +791,9 @@ export async function runVoiceConnectionCheck(
         status: 'fail',
         code: 'CERTIFICATE_PINNING_UNSUPPORTED',
         summary:
-          'Paracord’s media port presents a certificate the server generates for itself, and this browser cannot trust a certificate by fingerprint.',
+          'Archlast Mercury’s media port presents a certificate the server generates for itself, and this browser cannot trust a certificate by fingerprint.',
         remedy:
-          'Use Chrome or Edge, or the Paracord desktop app, for calls on this server. Firefox and Safari do not implement the certificate pinning a self-hosted media endpoint needs.',
+          'Use Chrome or Edge, or the Archlast Mercury desktop app, for calls on this server. Firefox and Safari do not implement the certificate pinning a self-hosted media endpoint needs.',
         detail: { certificate_source: config.certificateSource },
       };
     }

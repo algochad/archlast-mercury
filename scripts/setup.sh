@@ -48,11 +48,11 @@ CONFIG_FILE="$PROJECT_ROOT/config/paracord.toml"
 EXAMPLE_FILE="$PROJECT_ROOT/config/paracord.example.toml"
 
 if [ -f "$CONFIG_FILE" ]; then
-    echo "  Config already exists at config/paracord.toml"
+    echo "  Config already exists at config/mercury.toml"
 elif [ -f "$EXAMPLE_FILE" ]; then
     cp "$EXAMPLE_FILE" "$CONFIG_FILE"
-    echo "  Copied config/paracord.example.toml -> config/paracord.toml"
-    echo "  Edit config/paracord.toml before production use."
+    echo "  Copied config/paracord.example.toml -> config/mercury.toml"
+    echo "  Edit config/mercury.toml before production use."
 else
     echo "  WARNING: config/paracord.example.toml not found; skipping config copy"
 fi
@@ -91,7 +91,7 @@ echo
 echo "=== Setup Complete ==="
 echo
 echo "To run the server:"
-echo "  cargo run --bin paracord-server"
+echo "  cargo run --bin mercury-server"
 echo
 echo "To run the client dev server in another terminal:"
 echo "  cd client && npm run dev"

@@ -1,4 +1,4 @@
-export const APP_NAME = 'Paracord';
+export const APP_NAME = 'Archlast Mercury';
 /** The build's own version (vite `define`), so About can never drift. */
 export const APP_VERSION =
   typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0-dev';

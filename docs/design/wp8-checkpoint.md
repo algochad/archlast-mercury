@@ -302,10 +302,10 @@ failed, the fix is named.
 | `npm run build` | pass |
 | `npm run contracts:check` | pass — 27 Rust-derived types |
 | `npx playwright test` (mocked, all three projects) | **84/84** |
-| `PARACORD_E2E_REAL=1 PARACORD_E2E_MEDIA_PORT=18151 npx playwright test --workers=1` | **11/11** |
+| `MERCURY_E2E_REAL=1 MERCURY_E2E_MEDIA_PORT=18151 npx playwright test --workers=1` | **11/11** |
 | `npx playwright test -c playwright.messaging.config.ts` | **6/6** |
 | `npx playwright test -c playwright.dm-attachments.config.ts` | **1/1** |
-| `cargo build --release --bin paracord-server` | pass |
+| `cargo build --release --bin mercury-server` | pass |
 | `cargo check --workspace --all-targets` | pass |
 | `cargo fmt --all -- --check` | **fails — pre-existing, see below** |
 | `git diff 83ea4ff --stat -- crates/` | **empty.** No server code changed in the whole overhaul |
@@ -348,13 +348,13 @@ left. It resolves itself when the branches meet.
 
 ## 9. The design-review set (B9)
 
-`PARACORD_E2E_DESIGN_OUT` was added so every package's frames can be gathered
+`MERCURY_E2E_DESIGN_OUT` was added so every package's frames can be gathered
 into one folder:
 
 ```bash
 cd client
 for wp in wp0 wp1 wp2 wp3 wp4 wp5 wp6 wp7; do
-  PARACORD_E2E_DESIGN=1 PARACORD_E2E_DESIGN_WP=$wp PARACORD_E2E_DESIGN_OUT=final \
+  MERCURY_E2E_DESIGN=1 MERCURY_E2E_DESIGN_WP=$wp MERCURY_E2E_DESIGN_OUT=final \
     npx playwright test e2e/design-review.spec.ts
 done
 # -> output/design-reference/final/   (gitignored)

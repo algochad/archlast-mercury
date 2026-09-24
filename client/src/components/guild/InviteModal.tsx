@@ -110,11 +110,11 @@ async function resolveShareAddress(): Promise<ShareAddress> {
 function reachNote(reach: ShareReach): string {
   switch (reach) {
     case 'local_network':
-      return 'Right now this only works for people on the same network (the same Wi-Fi) as the server. For friends elsewhere, the router needs a port opened: see “Friends outside your network” in the Paracord docs.';
+      return 'Right now this only works for people on the same network (the same Wi-Fi) as the server. For friends elsewhere, the router needs a port opened: see “Friends outside your network” in the Archlast Mercury docs.';
     case 'this_computer':
       return 'This server can only be reached from this computer right now, so nobody else can use an invite yet. It needs to be started so that other computers can reach it.';
     default:
-      return 'Send this to a friend. It opens in any browser, and the Paracord app accepts it too.';
+      return 'Send this to a friend. It opens in any browser, and the Archlast Mercury app accepts it too.';
   }
 }
 
@@ -249,7 +249,7 @@ export function InviteModal({ guildName, channelId, onClose }: InviteModalProps)
 
           {/* The invite link — the one primary action in this dialog. An
               ordinary https link, because that is what works for a friend who
-              has never heard of Paracord: it opens in their browser. */}
+              has never heard of Archlast Mercury: it opens in their browser. */}
           <div>
             <FieldLabel>Invite link</FieldLabel>
             <InviteReadout dimmed={optionsDirty}>
@@ -286,7 +286,7 @@ export function InviteModal({ guildName, channelId, onClose }: InviteModalProps)
                 onClick={handleCopyAppLink}
                 className="pc-focusable mt-1 rounded-chip text-meta font-medium text-text-link hover:underline"
               >
-                Friend already has the Paracord app? Copy a link that opens it directly
+                Friend already has the Archlast Mercury app? Copy a link that opens it directly
               </button>
             )}
           </div>

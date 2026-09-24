@@ -1,4 +1,4 @@
-import axios, { type AxiosError, type AxiosInstance } from 'axios';
+import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { resolveApiBaseUrl } from '../lib/config/apiBaseUrl';
 import { getTauriAdapter } from '../lib/tauriAxiosAdapter';
 import { isTauri } from '../lib/tauriEnv';
@@ -37,13 +37,15 @@ let apiRequestSequence = 0;
 let clientInstanceSequence = 0;
 
 type TimedRequestConfig = {
+  _mercuryContext?: ApiRequestContext;
   _paracordContext?: ApiRequestContext;
   _pcStartMs?: number;
   _pcRequestId?: string;
   _pcAttempt?: number;
   method?: string;
   url?: string;
-};
+  signal?: AbortSignal;
+} & AxiosRequestConfig;
 
 function nowMs(): number {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -88,14 +90,21 @@ function readTraceIdFromHeaders(headers: unknown): string | null {
   if (typeof headerHolder.get === 'function') {
     // Call as a method so `this` stays bound: axios's AxiosHeaders.get relies
     // on `this` and throws if invoked detached from the headers instance.
-    const fromGet = headerHolder.get('x-paracord-trace-id');
+    const fromGetMercury = headerHolder.get('x-mercury-trace-id');
+    if (typeof fromGetMercury === 'string' && fromGetMercury.trim().length > 0) {
+      return fromGetMercury.trim();
+    }
+    const fromGet = headerHolder.get('x-paracord-trace-id'); // compat: fallback for Paracord servers
     if (typeof fromGet === 'string' && fromGet.trim().length > 0) {
       return fromGet.trim();
     }
   }
 
-  const raw = (headers as Record<string, unknown>)['x-paracord-trace-id']
-    ?? (headers as Record<string, unknown>)['X-Paracord-Trace-Id'];
+  const raw =
+    (headers as Record<string, unknown>)['x-mercury-trace-id'] ??
+    (headers as Record<string, unknown>)['X-Mercury-Trace-Id'] ??
+    (headers as Record<string, unknown>)['x-paracord-trace-id'] ?? // compat: deprecated Paracord header
+    (headers as Record<string, unknown>)['X-Paracord-Trace-Id']; // compat: deprecated Paracord header
   if (typeof raw === 'string' && raw.trim().length > 0) {
     return raw.trim();
   }
@@ -156,11 +165,10 @@ export function extractApiError(err: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// REST routing decision (PATH A: per-server REST)
+// REST routing decision (PATH A: per-server REST) — compat: Paracord references kept for history
 // ---------------------------------------------------------------------------
-// Paracord genuinely supports multiple simultaneously-connected servers:
+// Archlast Mercury genuinely supports multiple simultaneously-connected servers:
 // `connectionManager.connectAll()` opens a `ServerConnection` — each with its
-// own axios instance built by `createApiClient()` and its own isolated token —
 // for every entry in `serverListStore`, plus an optional `__local__`
 // connection. The UI tracks which server is focused via
 // `serverListStore.activeServerId`.
@@ -252,7 +260,7 @@ export function refreshSharedSession(): Promise<string> {
  * A refresh with no credential in it.
  *
  * The refresh endpoint takes the rotating token in the body, or — same-origin
- * in a browser — from the HttpOnly `paracord_refresh` cookie. The desktop has
+ * in a browser — from the HttpOnly `mercury_refresh` (legacy `paracord_refresh`) cookie. The desktop has
  * neither: its page is `tauri://localhost`, so no cookie of the instance's is
  * ever sent, and a POST with no body is not an expired session, it is a
  * malformed request. The server answered 400, the shell read "the session is
@@ -285,7 +293,7 @@ async function refreshLegacyToken(context?: ApiRequestContext): Promise<string> 
     const refresh = await apiClient.post<{ token: string; refresh_token?: string }>(
       '/auth/refresh',
       refreshToken ? { refresh_token: refreshToken } : undefined,
-      context ? { _paracordContext: context, signal: context.signal } : undefined,
+      context ? { _mercuryContext: context, _paracordContext: context, signal: context.signal } : undefined,
     );
     return { token: refresh.data.token, refreshToken: refresh.data.refresh_token ?? null };
   });
@@ -307,19 +315,21 @@ function markRequestApiReachable(baseURL: string | undefined, reachable: boolean
 
 // Auth interceptor for legacy client
 apiClient.interceptors.request.use((config) => {
+  const _ctx = (config as TimedRequestConfig)._mercuryContext ?? (config as TimedRequestConfig)._paracordContext;
   // Resolve at request time so "Add server" updates apply without full reload.
-  config._paracordContext?.assertCurrent();
-  if (config._paracordContext) {
-    if (config._paracordContext.historyEpoch) config.headers.set(DATABASE_HISTORY_HEADER, config._paracordContext.historyEpoch);
+  _ctx?.assertCurrent();
+  if (_ctx) {
+    if (_ctx.historyEpoch) config.headers.set(DATABASE_HISTORY_HEADER, _ctx.historyEpoch);
     else config.headers.delete(DATABASE_HISTORY_HEADER);
   }
-  config.baseURL = config._paracordContext?.baseURL ?? resolveApiBaseUrl();
+  config.baseURL = _ctx?.baseURL ?? resolveApiBaseUrl();
   startTiming(config as TimedRequestConfig);
   const token = getAccessToken();
   if (shouldAttachCsrf(config.method)) {
     const csrf = getCsrfToken();
     if (csrf) {
-      config.headers['X-Paracord-CSRF'] = csrf;
+      config.headers['X-Mercury-CSRF'] = csrf;
+      config.headers['X-Paracord-CSRF'] = csrf; // compat: deprecated Paracord header
     }
   }
   if (token && token !== 'null' && token !== 'undefined') {
@@ -331,7 +341,7 @@ apiClient.interceptors.request.use((config) => {
 // Error interceptor for legacy client
 apiClient.interceptors.response.use(
   (res) => {
-    res.config._paracordContext?.assertResponseCurrent?.(res.headers);
+    ((res.config as TimedRequestConfig)._mercuryContext ?? (res.config as TimedRequestConfig)._paracordContext)?.assertResponseCurrent?.(res.headers);
     const cfg = res.config as TimedRequestConfig;
     const tookMs = elapsedMs(cfg);
     if (tookMs != null && (API_TIMING_VERBOSE || tookMs >= API_SLOW_REQUEST_MS)) {
@@ -354,8 +364,8 @@ apiClient.interceptors.response.use(
       url?: string;
       headers?: Record<string, string>;
     } & TimedRequestConfig);
-    original?._paracordContext?.assertCurrent();
-    if (err.response) original?._paracordContext?.assertResponseCurrent?.(err.response.headers);
+    ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertCurrent();
+    if (err.response) ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertResponseCurrent?.(err.response.headers);
     const tookMs = elapsedMs(original ?? {});
     const traceId = readTraceIdFromHeaders(err.response?.headers);
     if (
@@ -387,13 +397,13 @@ apiClient.interceptors.response.use(
     ) {
       original._retry = true;
       try {
-        const nextToken = await refreshLegacyToken(original?._paracordContext);
-        original?._paracordContext?.assertCurrent();
+        const nextToken = await refreshLegacyToken(((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext));
+        ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertCurrent();
         original.headers = original.headers ?? {};
         original.headers.Authorization = `Bearer ${nextToken}`;
         return apiClient.request(original);
       } catch (refreshErr) {
-        original?._paracordContext?.assertCurrent();
+        ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertCurrent();
         // Only a definitive "this session is gone" ends the session. A refresh
         // that failed because the server was restarting must leave the
         // credential alone — ProtectedRoute redirects to /login via React
@@ -450,7 +460,7 @@ export function createApiClient(
       resolveRefreshScope(),
       async () => {
         // Pass the stored per-server refresh token in the body: for remote
-        // servers the HttpOnly `paracord_refresh` cookie is unavailable
+        // servers the HttpOnly `mercury_refresh` (legacy `paracord_refresh`) cookie is unavailable
         // cross-origin, so cookie-only refresh always 401s. Read it inside the
         // flight — a token captured before another caller's rotation is the
         // spent credential that trips reuse detection.
@@ -459,7 +469,7 @@ export function createApiClient(
         const refresh = await client.post<{ token: string; refresh_token?: string }>(
           '/auth/refresh',
           refreshToken ? { refresh_token: refreshToken } : undefined,
-          context ? { _paracordContext: context, signal: context.signal } : undefined,
+          context ? { _mercuryContext: context, _paracordContext: context, signal: context.signal } : undefined,
         );
         return { token: refresh.data.token, refreshToken: refresh.data.refresh_token ?? null };
       },
@@ -474,18 +484,20 @@ export function createApiClient(
 
   // Auth interceptor
   client.interceptors.request.use((config) => {
-    config._paracordContext?.assertCurrent();
-    if (config._paracordContext) {
-      if (config._paracordContext.historyEpoch) config.headers.set(DATABASE_HISTORY_HEADER, config._paracordContext.historyEpoch);
+    const _ctx2 = (config as TimedRequestConfig)._mercuryContext ?? (config as TimedRequestConfig)._paracordContext;
+    _ctx2?.assertCurrent();
+    if (_ctx2) {
+      if (_ctx2.historyEpoch) config.headers.set(DATABASE_HISTORY_HEADER, _ctx2.historyEpoch);
       else config.headers.delete(DATABASE_HISTORY_HEADER);
     }
-    if (config._paracordContext) config.baseURL = config._paracordContext.baseURL;
+    if (_ctx2) config.baseURL = _ctx2.baseURL;
     startTiming(config as TimedRequestConfig);
     const token = getToken();
     if (shouldAttachCsrf(config.method)) {
       const csrf = getCsrfToken();
       if (csrf) {
-        config.headers['X-Paracord-CSRF'] = csrf;
+        config.headers['X-Mercury-CSRF'] = csrf;
+        config.headers['X-Paracord-CSRF'] = csrf; // compat: deprecated Paracord header
       }
     }
     if (token && token !== 'null' && token !== 'undefined') {
@@ -497,7 +509,7 @@ export function createApiClient(
   // Error + refresh interceptor
   client.interceptors.response.use(
     (res) => {
-      res.config._paracordContext?.assertResponseCurrent?.(res.headers);
+      ((res.config as TimedRequestConfig)._mercuryContext ?? (res.config as TimedRequestConfig)._paracordContext)?.assertResponseCurrent?.(res.headers);
       const cfg = res.config as TimedRequestConfig;
       const tookMs = elapsedMs(cfg);
       if (tookMs != null && (API_TIMING_VERBOSE || tookMs >= API_SLOW_REQUEST_MS)) {
@@ -520,8 +532,8 @@ export function createApiClient(
         url?: string;
         headers?: Record<string, string>;
       } & TimedRequestConfig);
-      original?._paracordContext?.assertCurrent();
-      if (err.response) original?._paracordContext?.assertResponseCurrent?.(err.response.headers);
+      ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertCurrent();
+      if (err.response) ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertResponseCurrent?.(err.response.headers);
       const tookMs = elapsedMs(original ?? {});
       const traceId = readTraceIdFromHeaders(err.response?.headers);
       if (
@@ -553,13 +565,13 @@ export function createApiClient(
       ) {
         original._retry = true;
         try {
-          const nextToken = await refreshAccessToken(original?._paracordContext);
-          original?._paracordContext?.assertCurrent();
+          const nextToken = await refreshAccessToken(((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext));
+          ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertCurrent();
           original.headers = original.headers ?? {};
           original.headers.Authorization = `Bearer ${nextToken}`;
           return client.request(original);
         } catch (refreshErr) {
-          original?._paracordContext?.assertCurrent();
+          ((original as TimedRequestConfig | undefined)?._mercuryContext ?? (original as TimedRequestConfig | undefined)?._paracordContext)?.assertCurrent();
           // A refresh that failed because the server was unreachable or
           // restarting is not a reason to throw the credential away; only the
           // server saying the session is gone is.
@@ -576,3 +588,4 @@ export function createApiClient(
 
   return client;
 }
+

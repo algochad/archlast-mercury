@@ -6,7 +6,7 @@ const SECTIONS: LegalSection[] = [
     id: 'overview',
     heading: 'Overview',
     body: [
-      'These terms govern your use of this Paracord deployment. Paracord is self-hosted software; this instance is run by an independent operator who sets the rules that apply on top of these baseline terms.',
+      'These terms govern your use of this Archlast Mercury deployment. Archlast Mercury is self-hosted software; this instance is run by an independent operator who sets the rules that apply on top of these baseline terms.',
       'By creating an account or using the service, you agree to these terms and to any additional community rules the operator publishes.',
     ],
   },
@@ -72,7 +72,7 @@ export function TermsPage() {
       icon={ScrollText}
       title="Terms of Service"
       updated="July 2026"
-      intro="These terms set the baseline responsibilities for people using this Paracord deployment and for the operator who runs it."
+      intro="These terms set the baseline responsibilities for people using this Archlast Mercury deployment and for the operator who runs it."
       sections={SECTIONS}
     />
   );

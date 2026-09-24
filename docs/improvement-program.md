@@ -1627,7 +1627,7 @@ item 16 in progress. The rest of the program remains active.
 
 ## Guild wire-contract foundation (2026-09-12)
 
-- A small `paracord-contracts` crate owns actual guild summary/detail, settings,
+- A small `mercury-contracts` crate owns actual guild summary/detail, settings,
   mutation request and ownership-transfer wire types. List/detail/create/update/
   public-join/transfer handlers now return these types. Summary and detail are
   distinct; detail includes persisted feature flags, banner, system channel and
@@ -1763,12 +1763,12 @@ own evidence, exact commands and honest gaps are in
 
 - **Baseline repair.** The relay and desktop test targets did not compile
   (`ConnectionHandle::new`/`CallEventSink` signature drift); two stale client
-  test mocks and one lint error were fixed. `paracord-util` clippy failures on
+  test mocks and one lint error were fixed. `mercury-util` clippy failures on
   the current toolchain fixed. The PostgreSQL test harness now drops per-test
   databases and uses one advisory-locked template per migration set (the leak
   filled the 16 GB `/tmp` twice during the day).
 - **Item 14 (server/relay) — `relay-voice-lifecycle`.** Completed the
-  per-connection lease + per-call receipt fence in `paracord-relay`
+  per-connection lease + per-call receipt fence in `mercury-relay`
   (117 tests), fixed E2EE track-key delivery to peers that had not yet
   connected, corrected four DM voice tests that were silently 404-ing, aligned
   `leave_dm_voice` with `leave_voice` (mutation-checked regression). 119 voice
@@ -1786,7 +1786,7 @@ own evidence, exact commands and honest gaps are in
   release smoke script updated. `require_claim = false` is a loud, documented
   opt-out for unattended deployments.
 - **Item 8 — `contracts-expansion` (SWE-2).** Users, relationships, invites and
-  emojis now use `paracord-contracts` wire types, generated validators at the
+  emojis now use `mercury-contracts` wire types, generated validators at the
   client boundary, OpenAPI schemas; wire-shape tests on both engines.
 - **Items 1/3/5 — `messaging-integration`.** All three Playwright suites run
   against a fresh release build; four product defects found only by the live
@@ -1819,8 +1819,8 @@ own evidence, exact commands and honest gaps are in
   `-D warnings` and under the local 1.98 toolchain; rustfmt clean.
 
 Final gate on this branch (2026-09-13): rustfmt · clippy 1.91 · 83 test
-binaries / 1,481 tests on SQLite · `paracord-api` + `paracord-db` +
-`paracord-core` on PostgreSQL · client typecheck, eslint, 2,0xx unit tests,
+binaries / 1,481 tests on SQLite · `mercury-api` + `mercury-db` +
+`mercury-core` on PostgreSQL · client typecheck, eslint, 2,0xx unit tests,
 static a11y, contrast, production build, contracts check · release server build
 · Playwright mocked 84, real-server 13, production messaging, DM attachment
 confidentiality · installer smoke, shellcheck, Python syntax, migration sanity —
@@ -1840,7 +1840,7 @@ width), 16 (released SQLite upgrade fixture, encrypted-media recovery evidence).
   `docs/lantern-stage-spec.md`, per-package notes `docs/design/wp*-checkpoint.md`,
   motion inventory `docs/design/wp9-summary.md`) merged at `1f54b40`.
 - framer-motion removed; every overlay runs on `lib/motion`.
-- HTTP rate-limiter tiers are now env-overridable (`PARACORD_HTTP_RATE_LIMIT_*`,
+- HTTP rate-limiter tiers are now env-overridable (`MERCURY_HTTP_RATE_LIMIT_*`,
   defaults unchanged); the loopback e2e harness raises them because the suite's
   own traffic exceeded the product ceiling (13 cases ≈ 700 requests, 77 auth).
 - Release plumbing: `release.yml` creates **draft** releases; versions bumped to

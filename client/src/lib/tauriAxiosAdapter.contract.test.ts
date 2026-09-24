@@ -151,8 +151,8 @@ describe('the adapter hands back what axios promises', () => {
   it(headerCase.why, async () => {
     vi.mocked(invoke).mockResolvedValue(headerCase.response as never);
     const response = await tauriAdapter(config());
-    expect((response.headers as AxiosHeaders).get('X-Paracord-History-Epoch')).toBe(
-      headerCase.response.headers['x-paracord-history-epoch'],
+    expect((response.headers as AxiosHeaders).get('X-Mercury-History-Epoch')).toBe(
+      headerCase.response.headers['x-mercury-history-epoch'],
     );
     expect(response.statusText).toBe('OK');
   });
@@ -210,7 +210,7 @@ describe('the adapter hands back what axios promises', () => {
     vi.mocked(invoke).mockResolvedValue({ status: 200, body: { id: '42' } } as never);
     const response = await tauriAdapter(config());
     expect(response.status).toBe(200);
-    expect((response.headers as AxiosHeaders).get('X-Paracord-History-Epoch')).toBeFalsy();
+    expect((response.headers as AxiosHeaders).get('X-Mercury-History-Epoch')).toBeFalsy();
   });
 });
 

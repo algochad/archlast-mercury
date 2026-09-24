@@ -139,7 +139,7 @@ export function CustomCSS({ initialCSS = '', onSave }: CustomCSSProps) {
           value={css}
           onChange={(e) => setCss(e.target.value)}
           aria-label="Custom CSS"
-          placeholder={`/* Restyle Paracord with your own CSS. */\n\n:root {\n  --accent-primary: #24d196;\n}`}
+          placeholder={`/* Restyle Archlast Mercury with your own CSS. */\n\n:root {\n  --accent-primary: #24d196;\n}`}
           rows={16}
           className="block w-full resize-y bg-transparent p-4 pc-mono text-label leading-relaxed text-text-primary outline-none placeholder:text-text-faint"
           style={{ tabSize: 2, minHeight: '260px' }}

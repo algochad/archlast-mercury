@@ -31,7 +31,7 @@ function mapStatusForPresence(status: string | undefined): Presence['status'] {
   return 'online';
 }
 
-function isParacordProcess(app: ForegroundApplication): boolean {
+function isParacordProcess(app: ForegroundApplication): boolean { // compat: formerly Paracord
   const signature = `${app.process_name} ${app.executable_path || ''}`.toLowerCase();
   return signature.includes('paracord');
 }
@@ -181,7 +181,7 @@ export function useActivityPresence(options?: { idleTimeoutMs?: number }) {
         );
 
         const candidate =
-          detected && detected.process_name && !isParacordProcess(detected) ? detected : null;
+          detected && detected.process_name && !isParacordProcess(detected) ? detected : null; // compat: formerly Paracord
         const appId = candidate ? normalizeDetectedAppId(candidate.process_name) : '';
 
         if (appId) {
@@ -224,5 +224,4 @@ export function useActivityPresence(options?: { idleTimeoutMs?: number }) {
     };
   }, [token]);
 }
-
 

@@ -266,7 +266,7 @@ export async function tauriAdapter(config: InternalAxiosRequestConfig): Promise<
   }
 
   // Response headers are part of the API contract, not decoration: the
-  // operation context reads `X-Paracord-History-Epoch` off every response and
+  // operation context reads `X-Mercury-History-Epoch` off every response and
   // treats a mismatch as the account's database history having changed. An
   // empty header bag is a mismatch, so reporting `{}` here — which this adapter
   // did — made every desktop request look like a history change, expiring the

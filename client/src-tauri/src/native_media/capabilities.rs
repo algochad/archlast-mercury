@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use paracord_transport::stream::{
+use mercury_transport::stream::{
     VideoCodec, VideoCodecCapability as TransportVideoCodecCapability,
 };
 
@@ -74,7 +74,7 @@ pub fn video_codec_from_label(label: &str) -> Option<VideoCodec> {
 
 /// Whether the native (Rust) pipeline can decode `codec` in-process.
 ///
-/// This probes [`paracord_codec::video::decoder::create_decoder`] — the single
+/// This probes [`mercury_codec::video::decoder::create_decoder`] — the single
 /// source of truth for which codecs have a working native decoder backend —
 /// rather than inferring decode support from an *encoder* probe (a
 /// MediaFoundation H.264/AV1 encoder says nothing about decode). Codecs without
@@ -83,13 +83,13 @@ pub fn video_codec_from_label(label: &str) -> Option<VideoCodec> {
 /// the frontend via the session's `advertised_capabilities`, not inferred here.
 fn native_decode_supported(codec: VideoCodec) -> bool {
     let native_codec = match codec {
-        VideoCodec::Vp9 => paracord_codec::video::VideoCodec::Vp9,
-        VideoCodec::Av1 => paracord_codec::video::VideoCodec::Av1,
-        VideoCodec::H264 => paracord_codec::video::VideoCodec::H264,
+        VideoCodec::Vp9 => mercury_codec::video::VideoCodec::Vp9,
+        VideoCodec::Av1 => mercury_codec::video::VideoCodec::Av1,
+        VideoCodec::H264 => mercury_codec::video::VideoCodec::H264,
     };
-    paracord_codec::video::decoder::create_decoder(
+    mercury_codec::video::decoder::create_decoder(
         native_codec,
-        paracord_codec::video::DecoderConfig::default(),
+        mercury_codec::video::DecoderConfig::default(),
     )
     .is_ok()
 }
@@ -99,7 +99,7 @@ pub fn detect_media_stream_capabilities() -> MediaStreamCapabilities {
 
     #[cfg(target_os = "windows")]
     {
-        let av1_probe = paracord_codec::video::encoder::MfAv1Encoder::probe_backend(None).ok();
+        let av1_probe = mercury_codec::video::encoder::MfAv1Encoder::probe_backend(None).ok();
         video.push(VideoCodecCapability {
             codec: VideoCodec::Av1,
             backend: VideoBackendKind::MediaFoundation,
@@ -110,7 +110,7 @@ pub fn detect_media_stream_capabilities() -> MediaStreamCapabilities {
                 .unwrap_or(false),
             decode_hardware: false,
         });
-        let h264_probe = paracord_codec::video::encoder::MfH264Encoder::probe_backend(None).ok();
+        let h264_probe = mercury_codec::video::encoder::MfH264Encoder::probe_backend(None).ok();
         video.push(VideoCodecCapability {
             codec: VideoCodec::H264,
             backend: VideoBackendKind::MediaFoundation,
@@ -135,14 +135,14 @@ pub fn detect_media_stream_capabilities() -> MediaStreamCapabilities {
     {
         // Probe the real VideoToolbox encoder (constructs a session and encodes
         // one black keyframe), so `encode: true` means it genuinely works here.
-        let h264_probe = paracord_codec::video::encoder::videotoolbox::probe_h264_encoder();
+        let h264_probe = mercury_codec::video::encoder::videotoolbox::probe_h264_encoder();
         // Native H.264 decode is VideoToolbox on macOS. `decode` means a native
         // decoder exists; `decode_hardware` is asserted ONLY when VideoToolbox
         // confirms a hardware decoder via `VTIsHardwareDecodeSupported` (spec M3:
         // "unknown is not hardware"), never merely because a session can be built.
         let h264_native_decode = native_decode_supported(VideoCodec::H264);
         let h264_hw_decode = h264_native_decode
-            && paracord_codec::video::encoder::videotoolbox::supports_h264_hardware_decode();
+            && mercury_codec::video::encoder::videotoolbox::supports_h264_hardware_decode();
         video.push(VideoCodecCapability {
             codec: VideoCodec::H264,
             backend: VideoBackendKind::VideoToolbox,
@@ -171,7 +171,7 @@ pub fn detect_media_stream_capabilities() -> MediaStreamCapabilities {
         // true` means it genuinely works here. The backend kind stays `Vaapi`
         // for wire compatibility regardless of which lavc backend was chosen.
         let av1_probe =
-            paracord_codec::video::lavc::probe_lavc_encoder(paracord_codec::video::VideoCodec::Av1);
+            mercury_codec::video::lavc::probe_lavc_encoder(mercury_codec::video::VideoCodec::Av1);
         video.push(VideoCodecCapability {
             codec: VideoCodec::Av1,
             backend: VideoBackendKind::Vaapi,
@@ -182,8 +182,8 @@ pub fn detect_media_stream_capabilities() -> MediaStreamCapabilities {
                 .unwrap_or(false),
             decode_hardware: false,
         });
-        let h264_probe = paracord_codec::video::lavc::probe_lavc_encoder(
-            paracord_codec::video::VideoCodec::H264,
+        let h264_probe = mercury_codec::video::lavc::probe_lavc_encoder(
+            mercury_codec::video::VideoCodec::H264,
         );
         video.push(VideoCodecCapability {
             codec: VideoCodec::H264,
@@ -225,14 +225,14 @@ pub fn generate_decode_probe_frame(codec: &str) -> Option<Vec<u8>> {
     match codec.trim().to_ascii_lowercase().as_str() {
         "vp9" => generate_vp9_probe_frame(),
         #[cfg(target_os = "macos")]
-        "h264" => paracord_codec::video::encoder::videotoolbox::generate_h264_probe_frame(),
+        "h264" => mercury_codec::video::encoder::videotoolbox::generate_h264_probe_frame(),
         #[cfg(all(unix, not(target_os = "macos")))]
-        "h264" => paracord_codec::video::lavc::generate_probe_frame(
-            paracord_codec::video::VideoCodec::H264,
+        "h264" => mercury_codec::video::lavc::generate_probe_frame(
+            mercury_codec::video::VideoCodec::H264,
         ),
         #[cfg(all(unix, not(target_os = "macos")))]
-        "av1" => paracord_codec::video::lavc::generate_probe_frame(
-            paracord_codec::video::VideoCodec::Av1,
+        "av1" => mercury_codec::video::lavc::generate_probe_frame(
+            mercury_codec::video::VideoCodec::Av1,
         ),
         _ => None,
     }
@@ -240,7 +240,7 @@ pub fn generate_decode_probe_frame(codec: &str) -> Option<Vec<u8>> {
 
 #[cfg(feature = "vpx")]
 fn generate_vp9_probe_frame() -> Option<Vec<u8>> {
-    use paracord_codec::video::{
+    use mercury_codec::video::{
         encoder::create_encoder, EncoderConfig, PixelFormat, VideoContentHint,
     };
 
@@ -254,7 +254,7 @@ fn generate_vp9_probe_frame() -> Option<Vec<u8>> {
         content_hint: VideoContentHint::Default,
     };
     let frame = vec![128u8; PixelFormat::I420.frame_size(320, 180)];
-    let mut encoder = create_encoder(paracord_codec::video::VideoCodec::Vp9, config).ok()?;
+    let mut encoder = create_encoder(mercury_codec::video::VideoCodec::Vp9, config).ok()?;
     encoder
         .encode(0, &frame, true)
         .ok()?

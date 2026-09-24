@@ -1,6 +1,6 @@
-# Paracord Native Federation Protocol (MVP Draft)
+# Archlast Mercury Native Federation Protocol (MVP Draft)
 
-This document defines the MVP federation model for Paracord-to-Paracord interoperability.
+This document defines the MVP federation model for Archlast Mercury-to-Archlast Mercury interoperability.
 
 ## Goals
 
@@ -37,13 +37,13 @@ All federated events are sent as signed envelopes:
 
 - HTTPS JSON APIs between servers.
 - Required headers:
-  - `X-Paracord-Origin`
-  - `X-Paracord-Key-Id`
-  - `X-Paracord-Timestamp`
-  - `X-Paracord-Signature`
+  - `X-Mercury-Origin`
+  - `X-Mercury-Key-Id`
+  - `X-Mercury-Timestamp`
+  - `X-Mercury-Signature`
 - Signature scope includes method, path, timestamp, and request body hash.
 - Inbound validation checks both:
-  - transport-hop authenticity (`X-Paracord-*` sender signature)
+  - transport-hop authenticity (`X-Mercury-*` sender signature)
   - envelope origin authenticity (`signatures` for `origin_server`)
 - This allows authenticated relay in non-full-mesh federation topologies.
 
@@ -57,13 +57,13 @@ All federated events are sent as signed envelopes:
 
 ## Federation APIs (MVP)
 
-- `GET /.well-known/paracord/server` (discovery)
-- `GET /_paracord/federation/v1/keys`
-- `POST /_paracord/federation/v1/event`
-- `GET /_paracord/federation/v1/event/{event_id}`
-- `POST /_paracord/federation/v1/invite`
-- `POST /_paracord/federation/v1/join`
-- `POST /_paracord/federation/v1/leave`
+- `GET /.well-known/mercury/server` (discovery)
+- `GET /_mercury/federation/v1/keys`
+- `POST /_mercury/federation/v1/event`
+- `GET /_mercury/federation/v1/event/{event_id}`
+- `POST /_mercury/federation/v1/invite`
+- `POST /_mercury/federation/v1/join`
+- `POST /_mercury/federation/v1/leave`
 
 ## Trust and Safety
 

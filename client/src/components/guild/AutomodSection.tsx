@@ -700,7 +700,7 @@ function TriggerFields({
           <Well bare className="divide-y divide-border-subtle px-4">
             <ToggleRow
               label="Block invite links"
-              description="Invites to other servers on any Paracord instance."
+              description="Invites to other servers on any Archlast Mercury instance."
               checked={meta.block_invites ?? false}
               onChange={(v) => onChange({ ...meta, block_invites: v })}
             />

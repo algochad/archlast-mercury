@@ -17,7 +17,7 @@ import { cn } from '../lib/utils';
 /**
  * The app mark: a solid emerald tile with two interlocking links, a nod to the
  * server-to-server nature of the thing. Solid, because a gradient across a
- * surface is a kill-list item (§6.2) and the emerald already means "Paracord".
+ * surface is a kill-list item (§6.2) and the emerald already means "Archlast Mercury".
  */
 export function AppMark({ size = 44, className }: { size?: number; className?: string }) {
   return (
@@ -27,7 +27,7 @@ export function AppMark({ size = 44, className }: { size?: number; className?: s
       viewBox="0 0 44 44"
       fill="none"
       role="img"
-      aria-label="Paracord"
+      aria-label="Archlast Mercury"
       className={cn('shrink-0', className)}
     >
       <rect width="44" height="44" rx="12" fill="var(--accent-primary)" />

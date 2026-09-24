@@ -1476,7 +1476,7 @@ export function BotsSection({
     <SettingsPanel>
       <SectionHeader
         title="Bots"
-        description="Automations installed in this server — your own apps, third-party apps, and Paracord's built-ins."
+        description="Automations installed in this server — your own apps, third-party apps, and Archlast Mercury's built-ins."
       />
 
       {!canManage && <GateNotice>You need the Manage Server permission to add or remove bots.</GateNotice>}

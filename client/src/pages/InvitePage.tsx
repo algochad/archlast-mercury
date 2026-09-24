@@ -20,7 +20,7 @@ import { AUTH_FORM, AuthCanvas, AuthCard, AuthScroll, Field } from './authScaffo
 import type { InvitePreview } from '../api/generated/InvitePreview';
 
 /** Where the desktop installers live. */
-const APP_DOWNLOAD_URL = 'https://github.com/Scdouglas1999/Paracord/releases/latest';
+const APP_DOWNLOAD_URL = 'https://github.com/algochad/archlast-mercury/releases/latest';
 
 export function InvitePage() {
   const guildScope = useCurrentAccountScope();
@@ -170,7 +170,7 @@ export function InvitePage() {
                 onClick={() => navigate('/app')}
                 className="pc-focusable self-start rounded-[var(--radius-chip)] text-label font-semibold text-text-link transition-colors hover:text-accent-primary-hover"
               >
-                Back to Paracord
+                Back to Archlast Mercury
               </button>
             </div>
           )}

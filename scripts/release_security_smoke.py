@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run release-binary security smoke checks against a temporary server.
 
-This starts `target/release/paracord-server` with a throwaway SQLite database,
+This starts `target/release/mercury-server` with a throwaway SQLite database,
 waits for health, then runs the lightweight DAST and API fuzz scripts against
 that real release binary.
 """

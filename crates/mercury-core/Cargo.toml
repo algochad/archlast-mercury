@@ -1,0 +1,47 @@
+[package]
+name = "mercury-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+
+[features]
+default = ["native-media", "backup"]
+native-media = ["dep:mercury-relay", "dep:mercury-transport"]
+backup = ["dep:rusqlite", "dep:flate2", "dep:tar", "dep:tempfile"]
+
+[dependencies]
+arc-swap = { workspace = true }
+mercury-models = { workspace = true }
+mercury-db = { workspace = true }
+mercury-util = { workspace = true }
+mercury-media = { workspace = true }
+mercury-federation = { workspace = true }
+mercury-relay = { workspace = true, optional = true }
+mercury-transport = { workspace = true, optional = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+argon2 = { workspace = true }
+jsonwebtoken = { workspace = true }
+chrono = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
+# ESPN's public scoreboard. The workspace already depends on reqwest; this crate
+# did not, and the pull-through cache lives here rather than in the HTTP layer.
+reqwest = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+moka = { workspace = true }
+regex = { workspace = true }
+unicode-normalization = { workspace = true }
+unicode-properties = { workspace = true }
+dashmap = { workspace = true }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+flate2 = { version = "1", optional = true }
+tar = { version = "0.4", optional = true }
+tempfile = { workspace = true, optional = true }
+anyhow = { workspace = true }
+base64 = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }

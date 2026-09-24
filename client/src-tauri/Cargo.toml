@@ -1,5 +1,5 @@
 [package]
-name = "paracord-desktop"
+name = "mercury-desktop"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,7 +14,7 @@ libc = "0.2"
 tauri-plugin-os = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
-# paracord:// deep links. single-instance is required to deliver links to an
+# mercury:// deep links. single-instance is required to deliver links to an
 # already-running instance on Linux and Windows (their OS passes the URL as a
 # second-process argv, which the single-instance handler forwards).
 tauri-plugin-deep-link = "2"
@@ -39,13 +39,13 @@ image = { version = "0.25", default-features = false, features = ["jpeg"] }
 sha2 = "0.10"
 
 # Native QUIC media engine
-paracord-transport = { workspace = true }
-paracord-codec = { workspace = true }
+mercury-transport = { workspace = true }
+mercury-codec = { workspace = true }
 tokio = { workspace = true }
 bytes = { workspace = true }
 tracing = { workspace = true }
-# Without a subscriber every `tracing` event in this crate, `paracord-codec`,
-# `paracord-transport` and `paracord-relay` is discarded. That is why a client
+# Without a subscriber every `tracing` event in this crate, `mercury-codec`,
+# `mercury-transport` and `mercury-relay` is discarded. That is why a client
 # log could contain two voice joins and not one line about the microphone.
 tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
@@ -82,9 +82,9 @@ windows = { version = "0.61", features = [
 # In-process libavcodec GPU codec engine (hardware H.264/AV1 encode + native
 # H.264/AV1 decode). Enabled only on Linux/BSD (not macOS, not Windows), which
 # keeps those builds — and every server crate, none of which depend on
-# paracord-codec — free of the FFmpeg link.
+# mercury-codec — free of the FFmpeg link.
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
-paracord-codec = { workspace = true, features = ["lavc"] }
+mercury-codec = { workspace = true, features = ["lavc"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Secret Service over pure-Rust zbus (no libdbus headers to install) on the
@@ -117,4 +117,4 @@ nokhwa = { version = "0.10", features = ["input-avfoundation"] }
 [features]
 default = ["custom-protocol", "vpx"]
 custom-protocol = ["tauri/custom-protocol"]
-vpx = ["paracord-codec/vpx"]
+vpx = ["mercury-codec/vpx"]

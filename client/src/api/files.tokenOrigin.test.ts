@@ -234,6 +234,6 @@ describe('files native fetch credential binding', () => {
     const req = lastNativeRequest();
     expect(req.url).toBe(`${HOME_ORIGIN}/api/v1/attachments/9001`);
     expect(req.headers?.Authorization).toBe(`Bearer ${HOME_TOKEN}`);
-    expect(req.headers?.['X-Paracord-CSRF']).toBe(CSRF_VALUE);
+    expect(req.headers?.['X-Mercury-CSRF']).toBe(CSRF_VALUE);
   });
 });

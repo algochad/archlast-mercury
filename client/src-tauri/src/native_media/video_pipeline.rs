@@ -1,20 +1,20 @@
 use super::session::NativeMediaSession;
 use super::CallEventSink as AppHandle;
-use paracord_transport::protocol::MediaHeader;
-use paracord_transport::stream::PublishedTrack;
+use mercury_transport::protocol::MediaHeader;
+use mercury_transport::stream::PublishedTrack;
 
 #[cfg(feature = "vpx")]
 use bytes::{BufMut, Bytes, BytesMut};
 #[cfg(feature = "vpx")]
-use paracord_codec::crypto::TAG_SIZE;
+use mercury_codec::crypto::TAG_SIZE;
 #[cfg(feature = "vpx")]
-use paracord_codec::video::VideoCodec;
+use mercury_codec::video::VideoCodec;
 #[cfg(feature = "vpx")]
-use paracord_transport::protocol::{MediaStreamFrame, TrackType, VideoFrameMetadata, HEADER_SIZE};
+use mercury_transport::protocol::{MediaStreamFrame, TrackType, VideoFrameMetadata, HEADER_SIZE};
 #[cfg(feature = "vpx")]
-use paracord_transport::stream::VideoCodec as TransportVideoCodec;
+use mercury_transport::stream::VideoCodec as TransportVideoCodec;
 #[cfg(feature = "vpx")]
-use paracord_transport::stream::{StreamId, TrackId};
+use mercury_transport::stream::{StreamId, TrackId};
 #[cfg(feature = "vpx")]
 use std::collections::{BTreeMap, HashMap};
 #[cfg(feature = "vpx")]
@@ -93,7 +93,7 @@ const MAX_INFLIGHT_REASSEMBLY_FRAMES: usize = 128;
 /// uni-stream path, so this leaves orders of magnitude of headroom.
 #[cfg(feature = "vpx")]
 const MAX_REASSEMBLY_FRAGMENTS: usize =
-    paracord_transport::protocol::MAX_STREAM_FRAME_SIZE / FALLBACK_MAX_DATAGRAM_SIZE;
+    mercury_transport::protocol::MAX_STREAM_FRAME_SIZE / FALLBACK_MAX_DATAGRAM_SIZE;
 /// Maximum concurrently-running per-track decode workers.
 ///
 /// Workers are keyed by the sender-chosen `stream_id:track_id`, and each owns a
@@ -163,7 +163,7 @@ struct LocalPreviewFrame {
     timestamp_us: u64,
     is_keyframe: bool,
     codec: VideoCodec,
-    colorspace: paracord_codec::video::ColorSpace,
+    colorspace: mercury_codec::video::ColorSpace,
     pts: i64,
     width: u32,
     height: u32,
@@ -363,10 +363,10 @@ fn video_dispatch_state() -> &'static Mutex<VideoDispatchState> {
 #[cfg(feature = "vpx")]
 #[allow(clippy::type_complexity)]
 fn video_decoder_pool() -> &'static Mutex<
-    HashMap<String, Arc<Mutex<Box<dyn paracord_codec::video::decoder::VideoDecoder>>>>,
+    HashMap<String, Arc<Mutex<Box<dyn mercury_codec::video::decoder::VideoDecoder>>>>,
 > {
     static POOL: OnceLock<
-        Mutex<HashMap<String, Arc<Mutex<Box<dyn paracord_codec::video::decoder::VideoDecoder>>>>>,
+        Mutex<HashMap<String, Arc<Mutex<Box<dyn mercury_codec::video::decoder::VideoDecoder>>>>>,
     > = OnceLock::new();
     POOL.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -377,10 +377,10 @@ fn video_decoder_pool() -> &'static Mutex<
 #[cfg(feature = "vpx")]
 fn decoder_handle_for_track(
     track_key: &str,
-    codec: paracord_codec::video::VideoCodec,
-) -> Option<Arc<Mutex<Box<dyn paracord_codec::video::decoder::VideoDecoder>>>> {
-    use paracord_codec::video::decoder::{create_decoder_with_output, DecodeOutput};
-    use paracord_codec::video::DecoderConfig;
+    codec: mercury_codec::video::VideoCodec,
+) -> Option<Arc<Mutex<Box<dyn mercury_codec::video::decoder::VideoDecoder>>>> {
+    use mercury_codec::video::decoder::{create_decoder_with_output, DecodeOutput};
+    use mercury_codec::video::DecoderConfig;
 
     // Read the negotiated resolution BEFORE taking the decoder-pool lock, so the
     // dispatch-state lock is never nested inside it (every other site takes the
@@ -475,7 +475,7 @@ pub fn shutdown_all_decode_state() {}
 struct ReassembledVideoFrame {
     frame_id: u64,
     timestamp_us: u64,
-    encoded: paracord_codec::video::EncodedFrame,
+    encoded: mercury_codec::video::EncodedFrame,
     simulcast_layer: u8,
 }
 
@@ -514,7 +514,7 @@ impl KeyframeSink {
                     &track_id.0,
                     Some(layer_id),
                 );
-                let request = paracord_transport::control::ControlMessage::RequestKeyframe {
+                let request = mercury_transport::control::ControlMessage::RequestKeyframe {
                     stream_id: stream_id.clone(),
                     track_id: track_id.clone(),
                     layer_id: Some(layer_id),
@@ -895,7 +895,7 @@ async fn deliver_decoded_frame(
 /// request for a keyframe, or an unusable frame to silently drop.
 #[cfg(feature = "vpx")]
 enum HandleDecodeResult {
-    Frames(Vec<paracord_codec::video::DecodedFrameHandle>),
+    Frames(Vec<mercury_codec::video::DecodedFrameHandle>),
     NeedKeyframe,
     Drop,
 }
@@ -905,10 +905,10 @@ enum HandleDecodeResult {
 /// GPU, so the raw CPU downscale-to-viewport step is deleted on this path.
 #[cfg(feature = "vpx")]
 fn decode_frame_to_handles(
-    decoder: &mut dyn paracord_codec::video::decoder::VideoDecoder,
-    encoded: &paracord_codec::video::EncodedFrame,
+    decoder: &mut dyn mercury_codec::video::decoder::VideoDecoder,
+    encoded: &mercury_codec::video::EncodedFrame,
 ) -> HandleDecodeResult {
-    use paracord_codec::video::VideoError;
+    use mercury_codec::video::VideoError;
 
     match decoder.decode_to_handles(encoded) {
         Ok(handles) if !decoder.needs_keyframe() => HandleDecodeResult::Frames(handles),
@@ -924,7 +924,7 @@ fn decode_frame_to_handles(
 /// it actually produced, so this reads the frame's field directly rather than
 /// assuming the project default.
 #[cfg(feature = "vpx")]
-fn encoded_frame_colorspace(encoded: &paracord_codec::video::EncodedFrame) -> u8 {
+fn encoded_frame_colorspace(encoded: &mercury_codec::video::EncodedFrame) -> u8 {
     encoded.colorspace.header_tag()
 }
 
@@ -1544,7 +1544,8 @@ fn warn_codec_negotiation(app: Option<&AppHandle>, codec: VideoCodec, excluded: 
 /// anything else (including unset) defers to the default-on hardware policy.
 #[cfg(feature = "vpx")]
 fn simulcast_opted_out() -> bool {
-    std::env::var("PARACORD_SCREEN_SIMULCAST")
+    std::env::var("MERCURY_SCREEN_SIMULCAST")
+        .or_else(|_| std::env::var("PARACORD_SCREEN_SIMULCAST"))
         .map(|value| {
             matches!(
                 value.trim().to_ascii_lowercase().as_str(),
@@ -1668,7 +1669,7 @@ fn store_pulled_video_frame(
 pub fn bind_remote_video_track(
     stream_id: &str,
     track_id: &str,
-    layers: &[paracord_transport::stream::PublishedLayer],
+    layers: &[mercury_transport::stream::PublishedLayer],
 ) {
     let key = make_track_key(stream_id, track_id);
     let Ok(mut state) = video_dispatch_state().lock() else {
@@ -1705,7 +1706,7 @@ pub fn bind_remote_video_track(
 pub fn bind_remote_video_track(
     _stream_id: &str,
     _track_id: &str,
-    _layers: &[paracord_transport::stream::PublishedLayer],
+    _layers: &[mercury_transport::stream::PublishedLayer],
 ) {
 }
 
@@ -1787,7 +1788,7 @@ pub fn start_camera_share(
 ) -> Result<(), String> {
     #[cfg(feature = "vpx")]
     {
-        use paracord_codec::video::{EncoderConfig, PixelFormat, VideoContentHint};
+        use mercury_codec::video::{EncoderConfig, PixelFormat, VideoContentHint};
 
         let codec = choose_best_publish_codec(session, default_camera_codec(), None);
         tracing::info!(
@@ -1889,7 +1890,7 @@ pub fn stop_camera_share(session: &mut NativeMediaSession) {
 }
 
 #[cfg(feature = "vpx")]
-fn default_camera_codec() -> paracord_codec::video::VideoCodec {
+fn default_camera_codec() -> mercury_codec::video::VideoCodec {
     default_screen_codec()
 }
 
@@ -1902,19 +1903,19 @@ fn default_camera_codec() -> paracord_codec::video::VideoCodec {
 /// or simulcast is opted out, only the single top (source) rung is kept.
 #[cfg(feature = "vpx")]
 fn build_simulcast_configs(
-    kind: paracord_codec::video::SimulcastKind,
+    kind: mercury_codec::video::SimulcastKind,
     codec: VideoCodec,
     target_width: u32,
     target_height: u32,
     target_fps: u32,
     target_bitrate_kbps: u32,
-    content_hint: paracord_codec::video::VideoContentHint,
-    pixel_format: paracord_codec::video::PixelFormat,
+    content_hint: mercury_codec::video::VideoContentHint,
+    pixel_format: mercury_codec::video::PixelFormat,
 ) -> Vec<(
-    paracord_codec::video::SimulcastLayer,
-    paracord_codec::video::EncoderConfig,
+    mercury_codec::video::SimulcastLayer,
+    mercury_codec::video::EncoderConfig,
 )> {
-    let mut ladder = paracord_codec::video::simulcast_ladder(
+    let mut ladder = mercury_codec::video::simulcast_ladder(
         kind,
         target_width,
         target_height,
@@ -1940,23 +1941,23 @@ fn create_camera_simulcast_encoder(
     input_width: u32,
     input_height: u32,
     layers: &[(
-        paracord_codec::video::SimulcastLayer,
-        paracord_codec::video::EncoderConfig,
+        mercury_codec::video::SimulcastLayer,
+        mercury_codec::video::EncoderConfig,
     )],
 ) -> Result<super::session::NativeSimulcastState, String> {
-    use paracord_codec::video::encoder::{create_encoder, SimulcastEncoder};
-    use paracord_codec::video::VideoCodec;
+    use mercury_codec::video::encoder::{create_encoder, SimulcastEncoder};
+    use mercury_codec::video::VideoCodec;
 
     fn build_with_codec(
         codec: VideoCodec,
-        input_format: paracord_codec::video::PixelFormat,
+        input_format: mercury_codec::video::PixelFormat,
         input_width: u32,
         input_height: u32,
         layers: &[(
-            paracord_codec::video::SimulcastLayer,
-            paracord_codec::video::EncoderConfig,
+            mercury_codec::video::SimulcastLayer,
+            mercury_codec::video::EncoderConfig,
         )],
-    ) -> Result<SimulcastEncoder, paracord_codec::video::VideoError> {
+    ) -> Result<SimulcastEncoder, mercury_codec::video::VideoError> {
         SimulcastEncoder::new_with_configs(input_width, input_height, input_format, layers, |cfg| {
             // The in-process libavcodec hardware encoders take capture-sized
             // packed input and scale/convert on the GPU (parity with the screen
@@ -1964,7 +1965,7 @@ fn create_camera_simulcast_encoder(
             #[cfg(all(unix, not(target_os = "macos")))]
             if matches!(codec, VideoCodec::H264 | VideoCodec::Av1) {
                 return Ok(Box::new(
-                    paracord_codec::video::lavc::LavcEncoder::new_with_input(
+                    mercury_codec::video::lavc::LavcEncoder::new_with_input(
                         codec,
                         cfg,
                         input_width,
@@ -1982,7 +1983,7 @@ fn create_camera_simulcast_encoder(
     let preferred_input_format = layers
         .last()
         .map(|(_, config)| config.pixel_format)
-        .unwrap_or(paracord_codec::video::PixelFormat::I420);
+        .unwrap_or(mercury_codec::video::PixelFormat::I420);
     // No silent codec substitution (parity with the screen path): a failed init
     // means the capability probe and reality disagree — surface it.
     let (codec, encoder, effective_layers) = match build_with_codec(
@@ -2022,7 +2023,7 @@ pub fn start_screen_share(
 ) -> Result<(), String> {
     #[cfg(feature = "vpx")]
     {
-        use paracord_codec::video::{EncoderConfig, PixelFormat, VideoContentHint};
+        use mercury_codec::video::{EncoderConfig, PixelFormat, VideoContentHint};
 
         let codec = match preferred_codec {
             Some(label) => super::capabilities::video_codec_from_label(label)
@@ -2137,7 +2138,7 @@ pub fn stop_screen_share(session: &mut NativeMediaSession) {
 }
 
 #[cfg(feature = "vpx")]
-fn default_screen_codec() -> paracord_codec::video::VideoCodec {
+fn default_screen_codec() -> mercury_codec::video::VideoCodec {
     // macOS now has a hardware H.264 encoder (VideoToolbox), joining Windows
     // (Media Foundation) and Linux (lavc) — H.264 is the default everywhere with
     // a hardware backend; VP9 (libvpx) remains the floor on other platforms.
@@ -2147,7 +2148,7 @@ fn default_screen_codec() -> paracord_codec::video::VideoCodec {
         all(unix, not(target_os = "macos"))
     ))]
     {
-        paracord_codec::video::VideoCodec::H264
+        mercury_codec::video::VideoCodec::H264
     }
 
     #[cfg(not(any(
@@ -2156,13 +2157,13 @@ fn default_screen_codec() -> paracord_codec::video::VideoCodec {
         all(unix, not(target_os = "macos"))
     )))]
     {
-        paracord_codec::video::VideoCodec::Vp9
+        mercury_codec::video::VideoCodec::Vp9
     }
 }
 
 #[cfg(feature = "vpx")]
 fn build_track_layer_ssrcs(user_id: i64, kind: &str) -> Vec<(u8, u32)> {
-    use paracord_codec::video::SimulcastLayer;
+    use mercury_codec::video::SimulcastLayer;
 
     [
         (SimulcastLayer::Low, 0u8),
@@ -2187,23 +2188,23 @@ fn create_screen_simulcast_encoder(
     input_width: u32,
     input_height: u32,
     layers: &[(
-        paracord_codec::video::SimulcastLayer,
-        paracord_codec::video::EncoderConfig,
+        mercury_codec::video::SimulcastLayer,
+        mercury_codec::video::EncoderConfig,
     )],
 ) -> Result<super::session::NativeSimulcastState, String> {
-    use paracord_codec::video::encoder::{create_encoder, SimulcastEncoder};
-    use paracord_codec::video::VideoCodec;
+    use mercury_codec::video::encoder::{create_encoder, SimulcastEncoder};
+    use mercury_codec::video::VideoCodec;
 
     fn build_with_codec(
         codec: VideoCodec,
-        input_format: paracord_codec::video::PixelFormat,
+        input_format: mercury_codec::video::PixelFormat,
         input_width: u32,
         input_height: u32,
         layers: &[(
-            paracord_codec::video::SimulcastLayer,
-            paracord_codec::video::EncoderConfig,
+            mercury_codec::video::SimulcastLayer,
+            mercury_codec::video::EncoderConfig,
         )],
-    ) -> Result<SimulcastEncoder, paracord_codec::video::VideoError> {
+    ) -> Result<SimulcastEncoder, mercury_codec::video::VideoError> {
         SimulcastEncoder::new_with_configs(input_width, input_height, input_format, layers, |cfg| {
             // The in-process libavcodec hardware encoders (H.264/AV1) take
             // capture-sized input and scale/convert on the GPU, so construct
@@ -2212,7 +2213,7 @@ fn create_screen_simulcast_encoder(
             #[cfg(all(unix, not(target_os = "macos")))]
             if matches!(codec, VideoCodec::H264 | VideoCodec::Av1) {
                 return Ok(Box::new(
-                    paracord_codec::video::lavc::LavcEncoder::new_with_input(
+                    mercury_codec::video::lavc::LavcEncoder::new_with_input(
                         codec,
                         cfg,
                         input_width,
@@ -2230,7 +2231,7 @@ fn create_screen_simulcast_encoder(
     let preferred_input_format = layers
         .last()
         .map(|(_, config)| config.pixel_format)
-        .unwrap_or(paracord_codec::video::PixelFormat::I420);
+        .unwrap_or(mercury_codec::video::PixelFormat::I420);
     // No silent codec substitution: the codec was negotiated from advertised
     // capabilities, so a failed init here means the capability probe and
     // reality disagree — surface that instead of streaming something else.
@@ -2313,7 +2314,7 @@ pub struct CameraFrameJob {
     key_epoch: u8,
     connection: quinn::Connection,
     max_fragment_payload: usize,
-    frame_encryptor: Arc<Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: Arc<Mutex<mercury_codec::crypto::FrameEncryptor>>,
     video_force_keyframe: Arc<AtomicBool>,
     i420_convert_buf: Vec<u8>,
 }
@@ -2342,7 +2343,7 @@ pub async fn begin_camera_frame(
     app: Option<&AppHandle>,
     capture_time: std::time::SystemTime,
 ) -> Result<CameraFrameJob, String> {
-    use paracord_codec::video::EncoderConfig;
+    use mercury_codec::video::EncoderConfig;
 
     let frame_width = width & !1;
     let frame_height = height & !1;
@@ -2382,14 +2383,14 @@ pub async fn begin_camera_frame(
         .validate()
         .map_err(|e| format!("camera encoder config: {e}"))?;
     let desired_layers = build_simulcast_configs(
-        paracord_codec::video::SimulcastKind::Camera,
+        mercury_codec::video::SimulcastKind::Camera,
         requested_codec,
         desired_config.width,
         desired_config.height,
         desired_config.fps,
         desired_config.bitrate_kbps,
         // Camera favors motion smoothness at lower resolutions (spec §4.1).
-        paracord_codec::video::VideoContentHint::Motion,
+        mercury_codec::video::VideoContentHint::Motion,
         desired_config.pixel_format,
     );
     let needs_reinit = session
@@ -2525,7 +2526,7 @@ pub fn run_camera_frame(
     input_is_bgra: bool,
     app: Option<&AppHandle>,
 ) -> Result<CameraFrameOutcome, String> {
-    use paracord_codec::video::{bgra_to_i420, rgba_to_i420, EncodedFrame, PixelFormat};
+    use mercury_codec::video::{bgra_to_i420, rgba_to_i420, EncodedFrame, PixelFormat};
 
     let mut simulcast = job
         .simulcast
@@ -2884,7 +2885,7 @@ pub struct ScreenFrameJob {
     key_epoch: u8,
     connection: quinn::Connection,
     max_fragment_payload: usize,
-    frame_encryptor: Arc<Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: Arc<Mutex<mercury_codec::crypto::FrameEncryptor>>,
     screen_force_keyframe: Arc<AtomicBool>,
     i420_convert_buf: Vec<u8>,
 }
@@ -2915,7 +2916,7 @@ pub async fn begin_screen_frame(
     app: Option<&AppHandle>,
     capture_time: std::time::SystemTime,
 ) -> Result<ScreenFrameJob, String> {
-    use paracord_codec::video::EncoderConfig;
+    use mercury_codec::video::EncoderConfig;
 
     // Cropped-even dims computed from the raw capture dims; the actual crop copy
     // happens in `run_screen_frame`. Here we only need the dims the encoder is
@@ -2958,7 +2959,7 @@ pub async fn begin_screen_frame(
         .validate()
         .map_err(|e| format!("screen encoder config: {e}"))?;
     let desired_layers = build_simulcast_configs(
-        paracord_codec::video::SimulcastKind::Screen,
+        mercury_codec::video::SimulcastKind::Screen,
         requested_codec,
         desired_config.width,
         desired_config.height,
@@ -3104,7 +3105,7 @@ pub fn run_screen_frame(
     input_is_bgra: bool,
     app: Option<&AppHandle>,
 ) -> Result<ScreenFrameOutcome, String> {
-    use paracord_codec::video::{bgra_to_i420, rgba_to_i420, EncodedFrame, PixelFormat};
+    use mercury_codec::video::{bgra_to_i420, rgba_to_i420, EncodedFrame, PixelFormat};
 
     let mut simulcast = job
         .simulcast
@@ -3551,8 +3552,8 @@ fn align_dimensions_for_codec(codec: VideoCodec, width: u32, height: u32) -> (u3
 fn screen_encoder_input_format(
     codec: VideoCodec,
     input_is_bgra: bool,
-) -> paracord_codec::video::PixelFormat {
-    use paracord_codec::video::PixelFormat;
+) -> mercury_codec::video::PixelFormat {
+    use mercury_codec::video::PixelFormat;
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
@@ -3587,7 +3588,7 @@ pub fn handle_video_datagram(
 ) {
     #[cfg(feature = "vpx")]
     {
-        use paracord_codec::video::EncodedFrame;
+        use mercury_codec::video::EncodedFrame;
         let debug_index = VIDEO_HANDLE_DEBUG_COUNT.fetch_add(1, Ordering::Relaxed);
         if debug_index < 24 {
             eprintln!(
@@ -3619,7 +3620,7 @@ pub fn handle_video_datagram(
             // pipeline targets BT.709, so received frames are read as BT.709.
             // Native decode overrides this with the decoder's reported colorspace
             // when it stores the raw I420 result.
-            colorspace: paracord_codec::video::ColorSpace::default(),
+            colorspace: mercury_codec::video::ColorSpace::default(),
         };
         // The metadata's stream/track identity is what selects the reassembly
         // pool, decode worker, decoder instance, surface binding and webview
@@ -3671,13 +3672,13 @@ pub fn handle_video_datagram(
 /// `body` is one complete stream message (read to the stream's FIN).
 pub fn handle_video_stream_frame(
     body: &[u8],
-    frame_decryptor: &std::sync::Arc<std::sync::Mutex<paracord_codec::crypto::FrameDecryptor>>,
+    frame_decryptor: &std::sync::Arc<std::sync::Mutex<mercury_codec::crypto::FrameDecryptor>>,
     app: &super::CallEventSink,
     conn: &quinn::Connection,
 ) {
     #[cfg(feature = "vpx")]
     {
-        use paracord_codec::video::EncodedFrame;
+        use mercury_codec::video::EncodedFrame;
 
         if body.len() < HEADER_SIZE {
             return;
@@ -3750,7 +3751,7 @@ pub fn handle_video_stream_frame(
             // The wire frame carries no colorspace tag; the pipeline targets
             // BT.709, and native decode overrides this with the decoder's
             // reported colorspace when it stores raw I420.
-            colorspace: paracord_codec::video::ColorSpace::default(),
+            colorspace: mercury_codec::video::ColorSpace::default(),
         };
         let reassembled = ReassembledVideoFrame {
             frame_id: metadata.frame_id,
@@ -3796,7 +3797,7 @@ fn stream_frame_is_newest(track_key: &str, frame_id: u64) -> bool {
 #[cfg(feature = "vpx")]
 fn send_encoded_video_frame(
     connection: &quinn::Connection,
-    frame_encryptor: &std::sync::Arc<std::sync::Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: &std::sync::Arc<std::sync::Mutex<mercury_codec::crypto::FrameEncryptor>>,
     key_epoch: u8,
     ssrc: u32,
     seq: &mut u16,
@@ -3930,7 +3931,7 @@ fn should_send_on_stream(is_keyframe: bool, frame_len: usize, max_fragment_paylo
 #[cfg(feature = "vpx")]
 #[allow(clippy::too_many_arguments)]
 fn encode_stream_frame_message(
-    frame_encryptor: &std::sync::Arc<std::sync::Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: &std::sync::Arc<std::sync::Mutex<mercury_codec::crypto::FrameEncryptor>>,
     key_epoch: u8,
     ssrc: u32,
     seq: u16,
@@ -4001,7 +4002,7 @@ fn encode_stream_frame_message(
 #[allow(clippy::too_many_arguments)]
 fn send_encoded_video_frame_stream(
     connection: &quinn::Connection,
-    frame_encryptor: &std::sync::Arc<std::sync::Mutex<paracord_codec::crypto::FrameEncryptor>>,
+    frame_encryptor: &std::sync::Arc<std::sync::Mutex<mercury_codec::crypto::FrameEncryptor>>,
     key_epoch: u8,
     ssrc: u32,
     seq: &mut u16,
@@ -4248,13 +4249,13 @@ fn sync_published_video_track_metadata(session: &mut NativeMediaSession, is_scre
             registry.publish_track(updated_track.clone());
         }
         let message = if layers_only_update {
-            paracord_transport::control::ControlMessage::TrackLayers {
+            mercury_transport::control::ControlMessage::TrackLayers {
                 stream_id: updated_track.stream_id.clone(),
                 track_id: updated_track.track_id.clone(),
                 layers: updated_track.layers.clone(),
             }
         } else {
-            paracord_transport::control::ControlMessage::TrackPublish {
+            mercury_transport::control::ControlMessage::TrackPublish {
                 track: updated_track,
             }
         };
@@ -4265,7 +4266,7 @@ fn sync_published_video_track_metadata(session: &mut NativeMediaSession, is_scre
 #[cfg(feature = "vpx")]
 async fn send_control_message(
     conn: &quinn::Connection,
-    message: &paracord_transport::control::ControlMessage,
+    message: &mercury_transport::control::ControlMessage,
 ) -> Result<(), String> {
     let (mut send, _recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
     let encoded = message.encode().map_err(|e| e.to_string())?;
@@ -4308,7 +4309,7 @@ pub async fn publish_camera_track_for_current_config(
         registry.publish_track(track.clone());
     }
     session
-        .send_control_message(&paracord_transport::control::ControlMessage::TrackPublish {
+        .send_control_message(&mercury_transport::control::ControlMessage::TrackPublish {
             track: track.clone(),
         })
         .await?;
@@ -4322,7 +4323,7 @@ pub async fn publish_camera_track_for_current_config(
 #[cfg(feature = "vpx")]
 fn build_camera_track(
     session: &NativeMediaSession,
-) -> Result<paracord_transport::stream::PublishedTrack, String> {
+) -> Result<mercury_transport::stream::PublishedTrack, String> {
     let (codec, layers) = if let Some(simulcast) = session.video_simulcast.as_ref() {
         let active_layer_id = simulcast
             .layers
@@ -4346,7 +4347,7 @@ fn build_camera_track(
                         (*mapped_layer_id == layer_id).then_some(*ssrc)
                     })
                     .unwrap_or(session.video_ssrc);
-                Ok(paracord_transport::stream::PublishedLayer {
+                Ok(mercury_transport::stream::PublishedLayer {
                     layer_id,
                     ssrc,
                     width: Some(width),
@@ -4369,7 +4370,7 @@ fn build_camera_track(
             .map_err(|_| format!("camera track height too large: {}", config.height))?;
         (
             codec_to_transport(encoder.codec()),
-            vec![paracord_transport::stream::PublishedLayer {
+            vec![mercury_transport::stream::PublishedLayer {
                 layer_id: 0,
                 ssrc: session.video_ssrc,
                 width: Some(width),
@@ -4379,11 +4380,11 @@ fn build_camera_track(
             }],
         )
     };
-    Ok(paracord_transport::stream::PublishedTrack {
+    Ok(mercury_transport::stream::PublishedTrack {
         stream_id: StreamId::new(format!("stream:{}:camera", session.session_id)),
         track_id: TrackId::new("camera"),
         publisher_user_id: session.local_user_id,
-        kind: paracord_transport::control::TrackKind::Video,
+        kind: mercury_transport::control::TrackKind::Video,
         codec: Some(codec),
         layers,
     })
@@ -4444,7 +4445,7 @@ pub async fn publish_screen_track_for_current_config(
         registry.publish_track(track.clone());
     }
     session
-        .send_control_message(&paracord_transport::control::ControlMessage::TrackPublish {
+        .send_control_message(&mercury_transport::control::ControlMessage::TrackPublish {
             track: track.clone(),
         })
         .await?;
@@ -4528,8 +4529,8 @@ mod tests {
         ssrc: u32,
         width: u16,
         height: u16,
-    ) -> paracord_transport::stream::PublishedLayer {
-        paracord_transport::stream::PublishedLayer {
+    ) -> mercury_transport::stream::PublishedLayer {
+        mercury_transport::stream::PublishedLayer {
             layer_id: 0,
             ssrc,
             width: Some(width),
@@ -4685,9 +4686,9 @@ mod tests {
 
     #[test]
     fn decodes_vp9_keyframe_datagram_into_cpu_handle() {
-        use paracord_codec::video::decoder::{create_decoder, VideoDecoder};
-        use paracord_codec::video::encoder::create_encoder;
-        use paracord_codec::video::{
+        use mercury_codec::video::decoder::{create_decoder, VideoDecoder};
+        use mercury_codec::video::encoder::create_encoder;
+        use mercury_codec::video::{
             DecodedFrameHandle, DecoderConfig, EncoderConfig, PixelFormat, VideoContentHint,
         };
 
@@ -4756,7 +4757,7 @@ mod tests {
         // raw-I420 frame stored over IPC (that path is deleted, spec §2).
         let (decoded_metadata, encoded_bytes) =
             reassemble_video_payload(&header, &payload).expect("single fragment reassembles");
-        let encoded = paracord_codec::video::EncodedFrame {
+        let encoded = mercury_codec::video::EncodedFrame {
             data: encoded_bytes,
             codec: VideoCodec::Vp9,
             pts: decoded_metadata.frame_id as i64,
@@ -4764,7 +4765,7 @@ mod tests {
             layer: None,
             width: 0,
             height: 0,
-            colorspace: paracord_codec::video::ColorSpace::default(),
+            colorspace: mercury_codec::video::ColorSpace::default(),
         };
         let mut decoder: Box<dyn VideoDecoder> =
             create_decoder(VideoCodec::Vp9, DecoderConfig::default()).expect("vp9 decoder");
@@ -4812,7 +4813,7 @@ mod tests {
         }
         fn present(
             &mut self,
-            frame: paracord_codec::video::DecodedFrameHandle,
+            frame: mercury_codec::video::DecodedFrameHandle,
         ) -> Result<(), String> {
             if self.fail_present.load(Ordering::Relaxed) {
                 return Err("mock present failure".into());
@@ -4870,11 +4871,11 @@ mod tests {
         {
             let mut surface = binding.surface.lock().unwrap();
             surface
-                .present(paracord_codec::video::DecodedFrameHandle::CpuI420 {
+                .present(mercury_codec::video::DecodedFrameHandle::CpuI420 {
                     data: vec![0u8; 320 * 180 * 3 / 2],
                     width: 320,
                     height: 180,
-                    colorspace: paracord_codec::video::ColorSpace::Bt709,
+                    colorspace: mercury_codec::video::ColorSpace::Bt709,
                 })
                 .expect("present ok");
         }
@@ -4937,7 +4938,7 @@ mod tests {
         let garbage_keyframe = |frame_id: u64| ReassembledVideoFrame {
             frame_id,
             timestamp_us: frame_id * 33_000,
-            encoded: paracord_codec::video::EncodedFrame {
+            encoded: mercury_codec::video::EncodedFrame {
                 data: vec![0xA5; 64],
                 codec: VideoCodec::Vp9,
                 pts: frame_id as i64,
@@ -4945,7 +4946,7 @@ mod tests {
                 layer: None,
                 width: 320,
                 height: 240,
-                colorspace: paracord_codec::video::ColorSpace::Bt709,
+                colorspace: mercury_codec::video::ColorSpace::Bt709,
             },
             simulcast_layer: 0,
         };
@@ -5004,7 +5005,7 @@ mod tests {
 
     #[test]
     fn stream_frame_message_round_trips_encrypt_decrypt() {
-        use paracord_codec::crypto::{FrameDecryptor, FrameEncryptor, KEY_SIZE};
+        use mercury_codec::crypto::{FrameDecryptor, FrameEncryptor, KEY_SIZE};
 
         const SSRC: u32 = 0xDEAD_BEEF;
         const EPOCH: u8 = 4;
@@ -5090,8 +5091,8 @@ mod tests {
 
     #[tokio::test]
     async fn stream_keyframe_then_datagram_deltas_decode_in_order() {
-        use paracord_codec::video::encoder::create_encoder;
-        use paracord_codec::video::{EncoderConfig, PixelFormat, VideoContentHint};
+        use mercury_codec::video::encoder::create_encoder;
+        use mercury_codec::video::{EncoderConfig, PixelFormat, VideoContentHint};
 
         let width = 320u32;
         let height = 240u32;

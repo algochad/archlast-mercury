@@ -2,7 +2,7 @@
 //
 // It reported `headers: {}` for every request, because the Rust `native_fetch`
 // command returned only a status and a body. The API answers every call with
-// `X-Paracord-History-Epoch`, and the operation context compares it against the
+// `X-Mercury-History-Epoch`, and the operation context compares it against the
 // epoch the operation captured — absent is not equal, so on the desktop *every*
 // response looked like the account's database history had changed underneath
 // it. That expired the operation (an error on almost every screen) and asked
@@ -40,7 +40,7 @@ describe('the desktop HTTP adapter', () => {
     vi.mocked(invoke).mockResolvedValue({
       status: 200,
       body: { id: '42' },
-      headers: { 'x-paracord-history-epoch': epoch, 'content-type': 'application/json' },
+      headers: { 'x-mercury-history-epoch': epoch, 'content-type': 'application/json' },
     } as never);
 
     const response = await tauriAdapter(request());
@@ -84,7 +84,7 @@ describe('the desktop HTTP adapter', () => {
     vi.mocked(invoke).mockResolvedValue({
       status: 409,
       body: { code: 'HISTORY_CHANGED' },
-      headers: { 'x-paracord-history-epoch': epoch },
+      headers: { 'x-mercury-history-epoch': epoch },
     } as never);
 
     await expect(tauriAdapter(request())).rejects.toMatchObject({

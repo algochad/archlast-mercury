@@ -10,6 +10,7 @@ export interface ApiRequestContext {
 declare module 'axios' {
   interface AxiosRequestConfig<D = any> {
     data?: D;
+    _mercuryContext?: ApiRequestContext;
     _paracordContext?: ApiRequestContext;
   }
 }

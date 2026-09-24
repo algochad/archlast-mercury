@@ -77,6 +77,7 @@ type PlaywrightFixture = {
  */
 const AUDIO_PROBE = () => {
   const probe = { decoders: 0, decodedFrames: 0, buffers: 0, starts: 0 };
+  (window as unknown as { __mercuryAudioProbe: typeof probe }).__mercuryAudioProbe = probe;
   (window as unknown as { __paracordAudioProbe: typeof probe }).__paracordAudioProbe = probe;
 
   const NativeAudioDecoder = (window as unknown as { AudioDecoder?: typeof AudioDecoder })
@@ -127,7 +128,7 @@ interface AudioProbe {
 async function readAudioProbe(page: Page): Promise<AudioProbe> {
   return page.evaluate(
     () =>
-      (window as unknown as { __paracordAudioProbe?: AudioProbe }).__paracordAudioProbe ?? {
+      (window as unknown as { __mercuryAudioProbe?: AudioProbe }).__mercuryAudioProbe ?? (window as unknown as { __paracordAudioProbe?: AudioProbe }).__paracordAudioProbe ?? {
         decoders: 0,
         decodedFrames: 0,
         buffers: 0,
@@ -190,6 +191,7 @@ const VIDEO_PROBE = () => {
     deltaChunks: 0,
     errors: 0,
   };
+  (window as unknown as { __mercuryVideoProbe: typeof probe }).__mercuryVideoProbe = probe;
   (window as unknown as { __paracordVideoProbe: typeof probe }).__paracordVideoProbe = probe;
 
   const NativeVideoDecoder = (window as unknown as { VideoDecoder?: typeof VideoDecoder })
@@ -235,7 +237,7 @@ interface VideoProbe {
 async function readVideoProbe(page: Page): Promise<VideoProbe> {
   return page.evaluate(
     () =>
-      (window as unknown as { __paracordVideoProbe?: VideoProbe }).__paracordVideoProbe ?? {
+      (window as unknown as { __mercuryVideoProbe?: VideoProbe }).__mercuryVideoProbe ?? (window as unknown as { __paracordVideoProbe?: VideoProbe }).__paracordVideoProbe ?? {
         decoders: 0,
         decodedFrames: 0,
         keyChunks: 0,

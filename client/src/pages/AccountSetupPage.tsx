@@ -50,7 +50,7 @@ export function AccountSetupPage() {
                 to="/app"
                 className="pc-focusable rounded-[var(--radius-chip)] text-label font-semibold text-text-link underline underline-offset-4"
               >
-                Return to Paracord
+                Return to Archlast Mercury
               </Link>
             </div>
           </AuthCard>

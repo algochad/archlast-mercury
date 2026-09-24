@@ -243,7 +243,7 @@ the stylesheets.
 
 ## 4. The gate
 
-`PARACORD_E2E_MOTION=1 npx playwright test` (`npm run test:motion`), extended
+`MERCURY_E2E_MOTION=1 npx playwright test` (`npm run test:motion`), extended
 with the two moments WP9c is answerable for. Both are driven on
 `/design-tokens`, where the gesture is deterministic and a reviewer can replay
 exactly what was measured — the Motion section gains a **List reorder** card for
@@ -294,7 +294,7 @@ the panel for an exit nobody asked to see.
 
 ```
 cd client
-PARACORD_E2E_MOTION=1 PARACORD_E2E_MOTION_FRAMES=1 npx playwright test --grep "WP9c moments"
+MERCURY_E2E_MOTION=1 MERCURY_E2E_MOTION_FRAMES=1 npx playwright test --grep "WP9c moments"
 ```
 
 `button-hover`, `button-press`, `dialog-open`, `dialog-close`, `toast`,

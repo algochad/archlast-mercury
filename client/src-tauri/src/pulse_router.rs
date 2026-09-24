@@ -7,7 +7,7 @@
 //! venmic/Vesktop, driven through `pactl` (works on both PulseAudio and
 //! pipewire-pulse):
 //!
-//! 1. Load a private null sink (`paracord_stream_capture`).
+//! 1. Load a private null sink (`mercury_stream_capture`).
 //! 2. Load a `module-loopback` from that sink's monitor to the user's default
 //!    sink, so the user keeps hearing everything normally.
 //! 3. Move every application's playback stream into the null sink — EXCEPT
@@ -35,8 +35,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-pub const CAPTURE_SINK_NAME: &str = "paracord_stream_capture";
-pub const CAPTURE_SOURCE_NAME: &str = "paracord_stream_capture.monitor";
+pub const CAPTURE_SINK_NAME: &str = "mercury_stream_capture";
+pub const CAPTURE_SOURCE_NAME: &str = "mercury_stream_capture.monitor";
 /// Extra latency the loopback adds to what the user hears from other apps
 /// while streaming. Low enough to be unnoticeable, high enough to be stable.
 const LOOPBACK_LATENCY_MS: u32 = 40;

@@ -165,7 +165,7 @@ nine strips. Regenerate with:
 
 ```
 cd client
-PARACORD_E2E_MOTION=1 PARACORD_E2E_MOTION_FRAMES=1 npx playwright test --grep "WP9d"
+MERCURY_E2E_MOTION=1 MERCURY_E2E_MOTION_FRAMES=1 npx playwright test --grep "WP9d"
 ```
 
 `reaction-pop`, `reaction-leave`, `typing-pulse`, `plate-in`, `plate-out`,

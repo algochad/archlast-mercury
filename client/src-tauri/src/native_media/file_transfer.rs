@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use paracord_transport::connection::{ConnectionMode, MediaConnection};
-use paracord_transport::control::{ControlMessage, StreamFrame, StreamFrameCodec};
-use paracord_transport::endpoint::MediaEndpoint;
+use mercury_transport::connection::{ConnectionMode, MediaConnection};
+use mercury_transport::control::{ControlMessage, StreamFrame, StreamFrameCodec};
+use mercury_transport::endpoint::MediaEndpoint;
 
 use super::commands::FileTransferResult;
 use super::session::NativeMediaSession;
@@ -11,7 +11,7 @@ use super::session::NativeMediaSession;
 const CHUNK_SIZE: usize = 256 * 1024; // 256 KiB
 
 fn checked_download_size(total: u64, received: u64, incoming: usize) -> Result<u64, String> {
-    if total > paracord_transport::file_transfer::MAX_FILE_SIZE {
+    if total > mercury_transport::file_transfer::MAX_FILE_SIZE {
         return Err("download exceeds the maximum file size".into());
     }
     let next = received

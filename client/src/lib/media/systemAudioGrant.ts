@@ -1,13 +1,13 @@
 import { isTauri } from '../tauriEnv';
 
 /**
- * Whether this platform needs a Paracord-owned grant to capture the computer's
+ * Whether this platform needs a Archlast Mercury-owned grant to capture the computer's
  * own audio into a stream, and whether it has one.
  *
  * `required` is false where the operating system already owns that decision —
  * on Linux the desktop portal you answer when you pick a screen *is* the grant,
- * so there is nothing for Paracord to remember and nothing to manage here.
- * Windows has no such surface, so Paracord asks once per install and keeps the
+ * so there is nothing for Archlast Mercury to remember and nothing to manage here.
+ * Windows has no such surface, so Archlast Mercury asks once per install and keeps the
  * answer; that is the case this exists to make visible and revocable.
  */
 export interface SystemAudioGrant {

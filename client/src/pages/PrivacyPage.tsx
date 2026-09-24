@@ -6,8 +6,8 @@ const SECTIONS: LegalSection[] = [
     id: 'overview',
     heading: 'Overview',
     body: [
-      'Paracord is self-hosted software. This deployment is operated independently, and the instance operator — not the Paracord project — is the party responsible for the data it holds and the policies that govern it.',
-      'This page describes the kinds of data a Paracord instance processes so you can make an informed decision before you register. For questions specific to this deployment, contact its operator directly.',
+      'Archlast Mercury is self-hosted software. This deployment is operated independently, and the instance operator — not the Archlast Mercury project — is the party responsible for the data it holds and the policies that govern it.',
+      'This page describes the kinds of data a Archlast Mercury instance processes so you can make an informed decision before you register. For questions specific to this deployment, contact its operator directly.',
     ],
   },
   {
@@ -31,7 +31,7 @@ const SECTIONS: LegalSection[] = [
     id: 'federation',
     heading: 'Federation and other instances',
     body: [
-      'Paracord can federate with other instances. When you interact across a federation boundary — sending a message to a channel that spans instances, for example — the content and the identifiers needed to deliver it are shared with those peer servers.',
+      'Archlast Mercury can federate with other instances. When you interact across a federation boundary — sending a message to a channel that spans instances, for example — the content and the identifiers needed to deliver it are shared with those peer servers.',
       'Each peer instance is operated independently and applies its own policies to the data it receives. Review the peers your operator federates with if cross-server privacy matters to you.',
     ],
   },
@@ -67,7 +67,7 @@ export function PrivacyPage() {
       icon={ShieldCheck}
       title="Privacy Policy"
       updated="July 2026"
-      intro="This deployment is self-hosted, so data processing and retention are controlled by the instance operator. Here is what a Paracord instance collects and why."
+      intro="This deployment is self-hosted, so data processing and retention are controlled by the instance operator. Here is what a Archlast Mercury instance collects and why."
       sections={SECTIONS}
     />
   );

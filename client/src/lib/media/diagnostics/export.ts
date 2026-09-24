@@ -121,7 +121,7 @@ const STATUS_MARK: Record<DiagnosticStepResult['status'], string> = {
 export function diagnosticsExportText(report: DiagnosticReport): string {
   const redacted = buildRedactedReport(report) as unknown as DiagnosticReport;
   const lines: string[] = [
-    'Paracord voice connection check',
+    'Archlast Mercury voice connection check',
     `Result: ${redacted.overall.toUpperCase()}`,
     `Finished: ${redacted.finishedAt}`,
     `Account: ${redacted.account ?? '(not signed in)'}`,

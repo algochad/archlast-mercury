@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release-binary zero-config first-run smoke test.
 
-Proves that a fresh `paracord-server` boots with NO hand-written config and NO
+Proves that a fresh `mercury-server` boots with NO hand-written config and NO
 `livekit-server` binary on PATH, generates its config file, prints the friendly
 first-run summary (share URL, how to claim the server, native voice status),
 and that the first-owner claim is the only way that server gets an account.

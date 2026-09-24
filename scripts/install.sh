@@ -1,8 +1,8 @@
 #!/bin/sh
-# Paracord server installer — one-command install and upgrade for the release
-# binary.
+# Archlast Mercury server installer — one-command install and upgrade for the release
+# binary. (Compat alias: Paracord — old name, still accepted for one version.)
 #
-#   curl -fsSL https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.sh | sh
 #
 # What it does:
 #   - detects the OS/architecture and picks the matching server archive
@@ -10,12 +10,16 @@
 #   - resolves the latest release tag from the GitHub API (overridable)
 #   - verifies SHA-256 when the release publishes checksums; warns loudly when
 #     it does not (releases currently ship no checksum files — see docs)
-#   - installs into /opt/paracord as root, or ~/.local/share/paracord otherwise
-#   - as root on a systemd host: creates a `paracord` system user and a
+#   - installs into /opt/mercury as root, or ~/.local/share/mercury otherwise
+#     (falls back to /opt/paracord when upgrading)
+#   - as root on a systemd host: creates a `mercury` system user and a
 #     hardened, auto-restarting systemd unit; as a regular user with a systemd
 #     user manager: a per-user unit; otherwise prints the command to run
-#   - runs `paracord-server init` to generate config/paracord.toml (fresh JWT
+#   - runs `mercury-server init` to generate config/mercury.toml (fresh JWT
 #     secret, self-signed TLS defaults) and prints the URL to open
+#     (compat: also accepts paracord-server / config/paracord.toml)
+#     secret, self-signed TLS defaults) and prints the URL to open
+#     (compat: also accepts paracord-server / config/paracord.toml)
 #   - waits for the running server to mint the one-time owner setup token, turns
 #     it into a ready-to-open link (<local-url>/setup-server#claim=<TOKEN> — a
 #     fragment, so the token never reaches a server log or proxy log), opens it
@@ -23,31 +27,31 @@
 #   - re-running upgrades the binary in place: config/ and data/ are preserved
 #     and the previous binary is kept under backups/
 #
-# Environment overrides:
-#   PARACORD_VERSION            "2.0.0" or "v2.0.0" — skip latest-release lookup
-#   PARACORD_RELEASE_BASE_URL   URL base holding <tag>/<asset> (default GitHub)
-#   PARACORD_LOCAL_ARCHIVE      path to a local .tar.gz (or bare paracord-server
+# Environment overrides (MERCURY_* preferred; PARACORD_* still works as fallback):
+#   MERCURY_VERSION / PARACORD_VERSION            "2.0.0" or "v2.0.0" — skip latest-release lookup
+#   MERCURY_RELEASE_BASE_URL / PARACORD_RELEASE_BASE_URL   URL base holding <tag>/<asset> (default GitHub)
+#   MERCURY_LOCAL_ARCHIVE / PARACORD_LOCAL_ARCHIVE      path to a local .tar.gz (or bare mercury-server
 #                               binary) for offline installs and CI
-#   PARACORD_INSTALL_DIR        install destination
-#   PARACORD_LINK_DIR           directory for a `paracord-server` PATH symlink
-#   PARACORD_NO_SYSTEMD=1       never create or touch systemd units
-#   PARACORD_NO_BROWSER=1       never open a browser; just print the setup link
-#   PARACORD_GITHUB_REPO        owner/repo for release lookup
-#                               (default Scdouglas1999/Paracord)
+#   MERCURY_INSTALL_DIR / PARACORD_INSTALL_DIR        install destination
+#   MERCURY_LINK_DIR / PARACORD_LINK_DIR           directory for a `mercury-server` PATH symlink
+#   MERCURY_NO_SYSTEMD / PARACORD_NO_SYSTEMD=1       never create or touch systemd units
+#   MERCURY_NO_BROWSER / PARACORD_NO_BROWSER=1       never open a browser; just print the setup link
+#   MERCURY_GITHUB_REPO / PARACORD_GITHUB_REPO        owner/repo for release lookup
+#                               (default algochad/archlast-mercury)
 #
 # POSIX sh — works under dash, bash, ash. `set -eu` everywhere; any failure
 # aborts before the install directory is left half-written.
 set -eu
 
-PROG="paracord-install"
-GITHUB_REPO="${PARACORD_GITHUB_REPO:-Scdouglas1999/Paracord}"
-RELEASE_BASE_URL="${PARACORD_RELEASE_BASE_URL:-https://github.com/${GITHUB_REPO}/releases/download}"
+PROG="mercury-install"
+GITHUB_REPO="${MERCURY_GITHUB_REPO:-${PARACORD_GITHUB_REPO:-algochad/archlast-mercury}}"
+RELEASE_BASE_URL="${MERCURY_RELEASE_BASE_URL:-${PARACORD_RELEASE_BASE_URL:-https://github.com/${GITHUB_REPO}/releases/download}}"
 API_URL="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
-SERVICE_NAME="paracord"
+SERVICE_NAME="mercury"
 # launchd labels are reverse-DNS by convention and must be unique per machine.
-LAUNCHD_LABEL="com.paracord.server"
+LAUNCHD_LABEL="com.archlast.mercury"
 OS_FAMILY="linux"
-RUN_USER="paracord"
+RUN_USER="mercury"
 DOCS_URL="https://github.com/${GITHUB_REPO}/blob/main/docs/port-forwarding.md"
 
 # State the ending text reads. Set before anything can print.
@@ -96,7 +100,7 @@ Usage:
   sh install.sh [--help]
 
 Common invocations:
-  curl -fsSL https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.sh | sh
   curl -fsSL ... | sudo sh                                  # system install to /opt/paracord
   PARACORD_VERSION=2.0.0 sh install.sh                      # pin a release
   PARACORD_LOCAL_ARCHIVE=./paracord-server-linux-x64-2.0.0.tar.gz sh install.sh
@@ -129,10 +133,10 @@ need_cmd() { command -v "$1" >/dev/null 2>&1; }
 check_tools() {
     need_cmd uname || die "uname not found; this installer needs a POSIX system"
     need_cmd tar   || die "tar not found; install tar and retry"
-    if [ -z "${PARACORD_LOCAL_ARCHIVE:-}" ]; then
+    if [ -z "${MERCURY_LOCAL_ARCHIVE:-${PARACORD_LOCAL_ARCHIVE:-}}" ]; then
         if need_cmd curl; then FETCH=curl
         elif need_cmd wget; then FETCH=wget
-        else die "neither curl nor wget found; install one, or set PARACORD_LOCAL_ARCHIVE for an offline install"
+        else die "neither curl nor wget found; install one, or set MERCURY_LOCAL_ARCHIVE (or PARACORD_LOCAL_ARCHIVE) for an offline install"
         fi
     fi
 }
@@ -165,7 +169,7 @@ detect_platform() {
     case "$OS_FAMILY:$arch" in
         linux:x86_64|linux:amd64|linux:AMD64) PLATFORM="linux-x64" ;;
         linux:aarch64|linux:arm64)
-            die "no prebuilt Paracord server for Linux ARM64 — build from source or run the Docker stack on this host" ;;
+            die "no prebuilt Archlast Mercury server for Linux ARM64 — build from source or run the Docker stack on this host" ;;
         macos:arm64|macos:aarch64) PLATFORM="macos-arm64" ;;
         macos:x86_64|macos:amd64) PLATFORM="macos-x64" ;;
         *) die "unsupported architecture '$arch' on $os" ;;
@@ -176,23 +180,24 @@ detect_platform() {
 
 resolve_release() {
     # Sets TAG, VERSION_NUM, ASSET, DOWNLOAD_URL.
-    if [ -n "${PARACORD_VERSION:-}" ]; then
-        VERSION_NUM="${PARACORD_VERSION#v}"
+    _ver="${MERCURY_VERSION:-${PARACORD_VERSION:-}}"
+    if [ -n "${_ver:-}" ]; then
+        VERSION_NUM="${_ver#v}"
         TAG="v${VERSION_NUM}"
     else
-        step "Resolving latest Paracord release"
+        step "Resolving latest Archlast Mercury release"
         json="$TMP_DIR/release.json"
         fetch "$API_URL" "$json" 2>/dev/null \
-            || die "could not query ${API_URL} — check connectivity, or set PARACORD_VERSION / PARACORD_LOCAL_ARCHIVE"
+            || die "could not query ${API_URL} — check connectivity, or set MERCURY_VERSION / MERCURY_LOCAL_ARCHIVE (PARACORD_* also works)"
         if need_cmd jq; then
             TAG="$(jq -r '.tag_name' "$json")"
         else
             TAG="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$json" | head -n 1)"
         fi
-        [ -n "$TAG" ] || die "release lookup returned no tag_name — set PARACORD_VERSION explicitly"
+        [ -n "$TAG" ] || die "release lookup returned no tag_name — set MERCURY_VERSION (or PARACORD_VERSION) explicitly"
         VERSION_NUM="${TAG#v}"
     fi
-    ASSET="paracord-server-${PLATFORM}-${VERSION_NUM}.tar.gz"
+    ASSET="mercury-server-${PLATFORM}-${VERSION_NUM}.tar.gz"
     DOWNLOAD_URL="${RELEASE_BASE_URL}/${TAG}/${ASSET}"
     say "Release: ${TAG}  asset: ${ASSET}"
 }
@@ -218,10 +223,10 @@ maybe_verify_archive() {
     csum_found=0
     expected=""
 
-    if [ -n "${PARACORD_LOCAL_ARCHIVE:-}" ] && [ -f "${archive}.sha256" ]; then
+    if [ -n "${MERCURY_LOCAL_ARCHIVE:-${PARACORD_LOCAL_ARCHIVE:-}}" ] && [ -f "${archive}.sha256" ]; then
         expected="$(awk '{print $1}' "${archive}.sha256" | head -n 1)"
         csum_found=1
-    elif [ -z "${PARACORD_LOCAL_ARCHIVE:-}" ]; then
+    elif [ -z "${MERCURY_LOCAL_ARCHIVE:-${PARACORD_LOCAL_ARCHIVE:-}}" ]; then
         # Probe the checksum filenames a release might publish. The current
         # release workflow ships none — the first hit wins.
         for name in "${ASSET}.sha256" "SHA256SUMS" "SHA256SUMS.txt" "checksums.txt"; do
@@ -246,7 +251,7 @@ maybe_verify_archive() {
         warn "this release does not publish SHA-256 checksums — the archive cannot be integrity-verified.
        Downloaded from the official ${GITHUB_REPO} releases over TLS; if you need
        stronger guarantees, download the archive yourself, verify it out-of-band,
-       and install with PARACORD_LOCAL_ARCHIVE=<file>."
+       and install with MERCURY_LOCAL_ARCHIVE=<file> (PARACORD_LOCAL_ARCHIVE also works)."
     fi
 }
 
@@ -254,9 +259,10 @@ maybe_verify_archive() {
 
 acquire_archive() {
     # Sets ARCHIVE_PATH.
-    if [ -n "${PARACORD_LOCAL_ARCHIVE:-}" ]; then
-        [ -f "$PARACORD_LOCAL_ARCHIVE" ] || die "PARACORD_LOCAL_ARCHIVE='$PARACORD_LOCAL_ARCHIVE' does not exist"
-        ARCHIVE_PATH="$PARACORD_LOCAL_ARCHIVE"
+    _local="${MERCURY_LOCAL_ARCHIVE:-${PARACORD_LOCAL_ARCHIVE:-}}"
+    if [ -n "${_local:-}" ]; then
+        [ -f "$_local" ] || die "MERCURY_LOCAL_ARCHIVE='$_local' does not exist (also checked PARACORD_LOCAL_ARCHIVE)"
+        ARCHIVE_PATH="$_local"
         step "Using local archive: $ARCHIVE_PATH"
     else
         step "Downloading $DOWNLOAD_URL"
@@ -268,8 +274,9 @@ acquire_archive() {
 }
 
 extract_payload() {
-    # Fills $TMP_DIR/payload with: paracord-server (+ livekit-server,
-    # paracord.example.toml, README.txt when the archive ships them).
+    # Fills $TMP_DIR/payload with: mercury-server (+ livekit-server,
+    # mercury.toml, README.txt when the archive ships them).
+    # Compat: also accepts paracord-server / paracord.example.toml for one version.
     step "Unpacking"
     payload="$TMP_DIR/payload"
     mkdir -p "$payload"
@@ -277,28 +284,34 @@ extract_payload() {
     if tar -tzf "$ARCHIVE_PATH" >/dev/null 2>&1; then
         mkdir -p "$TMP_DIR/x"
         tar -xzf "$ARCHIVE_PATH" -C "$TMP_DIR/x"
-        # Current layout: paracord-server/{paracord-server,livekit-server,...}.
-        # Older releases: a bare paracord-server file at the archive root.
-        if [ -f "$TMP_DIR/x/paracord-server/paracord-server" ]; then
+        # Current layout: mercury-server/{mercury-server,livekit-server,...}.
+        # Older releases: paracord-server/{paracord-server,livekit-server,...}.
+        if [ -f "$TMP_DIR/x/mercury-server/mercury-server" ]; then
+            cp "$TMP_DIR/x/mercury-server/"* "$payload/" 2>/dev/null || true
+        elif [ -f "$TMP_DIR/x/paracord-server/paracord-server" ]; then
             cp "$TMP_DIR/x/paracord-server/"* "$payload/" 2>/dev/null || true
+        elif [ -f "$TMP_DIR/x/mercury-server" ]; then
+            cp "$TMP_DIR/x/mercury-server" "$payload/mercury-server"
         elif [ -f "$TMP_DIR/x/paracord-server" ]; then
-            cp "$TMP_DIR/x/paracord-server" "$payload/paracord-server"
+            cp "$TMP_DIR/x/paracord-server" "$payload/mercury-server"
         else
             # Last resort: search one level deep for an executable by name.
-            found="$(find "$TMP_DIR/x" -maxdepth 3 -type f -name 'paracord-server' | head -n 1)"
-            [ -n "$found" ] || die "archive does not contain a paracord-server binary — unexpected layout:\n$(tar -tzf "$ARCHIVE_PATH" | head -n 20)"
+            found="$(find "$TMP_DIR/x" -maxdepth 3 -type f \( -name 'mercury-server' -o -name 'paracord-server' \) | head -n 1)"
+            [ -n "$found" ] || die "archive does not contain a mercury-server (or paracord-server) binary — unexpected layout:\n$(tar -tzf "$ARCHIVE_PATH" | head -n 20)"
             dir="$(dirname "$found")"
             cp "$dir/"* "$payload/" 2>/dev/null || true
+            # Normalise old binary name to new
+            [ -f "$payload/mercury-server" ] || [ ! -f "$payload/paracord-server" ] || mv "$payload/paracord-server" "$payload/mercury-server"
         fi
     elif [ -x "$ARCHIVE_PATH" ] || head -c 4 "$ARCHIVE_PATH" 2>/dev/null | grep -q 'ELF'; then
-        # PARACORD_LOCAL_ARCHIVE pointed at a bare binary.
-        cp "$ARCHIVE_PATH" "$payload/paracord-server"
+        # MERCURY_LOCAL_ARCHIVE pointed at a bare binary.
+        cp "$ARCHIVE_PATH" "$payload/mercury-server"
     else
         die "archive is neither a .tar.gz nor an executable binary: $ARCHIVE_PATH"
     fi
 
-    [ -f "$payload/paracord-server" ] || die "no paracord-server binary found in the archive"
-    chmod 0755 "$payload/paracord-server"
+    [ -f "$payload/mercury-server" ] || die "no mercury-server binary found in the archive"
+    chmod 0755 "$payload/mercury-server"
     [ -f "$payload/livekit-server" ] && chmod 0755 "$payload/livekit-server"
     PAYLOAD_DIR="$payload"
 }
@@ -306,14 +319,24 @@ extract_payload() {
 # ── Install layout ───────────────────────────────────────────────────────────
 
 choose_install_dir() {
-    if [ -n "${PARACORD_INSTALL_DIR:-}" ]; then
-        INSTALL_DIR="$PARACORD_INSTALL_DIR"
+    _idir="${MERCURY_INSTALL_DIR:-${PARACORD_INSTALL_DIR:-}}"
+    if [ -n "${_idir:-}" ]; then
+        INSTALL_DIR="$_idir"
     elif [ "$(id -u)" = "0" ]; then
-        INSTALL_DIR="/opt/paracord"
+        # Prefer new path; fall back to old if it already exists (upgrade).
+        if [ -d "/opt/paracord" ] && [ ! -d "/opt/mercury" ]; then
+            INSTALL_DIR="/opt/paracord"
+        else
+            INSTALL_DIR="/opt/mercury"
+        fi
     else
-        INSTALL_DIR="${HOME}/.local/share/paracord"
+        if [ -d "${HOME}/.local/share/paracord" ] && [ ! -d "${HOME}/.local/share/mercury" ]; then
+            INSTALL_DIR="${HOME}/.local/share/paracord"
+        else
+            INSTALL_DIR="${HOME}/.local/share/mercury"
+        fi
     fi
-    CONFIG_PATH="$INSTALL_DIR/config/paracord.toml"
+    CONFIG_PATH="$INSTALL_DIR/config/mercury.toml"
     DATA_DIR="$INSTALL_DIR/data"
 }
 
@@ -327,34 +350,45 @@ install_files() {
     stage="$INSTALL_DIR/.install-stage.$$"
     rm -rf "$stage"
     mkdir -p "$stage"
-    for f in paracord-server livekit-server paracord.example.toml README.txt; do
+    # Primary: mercury-server; compat: also keep paracord-server alias if present
+    for f in mercury-server livekit-server mercury.toml paracord.example.toml mercury.example.toml README.txt; do
         [ -f "$PAYLOAD_DIR/$f" ] && cp "$PAYLOAD_DIR/$f" "$stage/$f"
     done
+    # Normalise old example name
+    [ -f "$stage/mercury.toml" ] || [ ! -f "$stage/paracord.example.toml" ] || cp "$stage/paracord.example.toml" "$stage/mercury.toml"
+    [ -f "$stage/mercury.example.toml" ] || [ ! -f "$stage/paracord.example.toml" ] || cp "$stage/paracord.example.toml" "$stage/mercury.example.toml"
 
-    if [ -f "$INSTALL_DIR/paracord-server" ]; then
+    if [ -f "$INSTALL_DIR/mercury-server" ] || [ -f "$INSTALL_DIR/paracord-server" ]; then
         IS_UPGRADE=1
-        backup="$INSTALL_DIR/backups/paracord-server.$(date +%Y%m%d-%H%M%S)"
-        mv "$INSTALL_DIR/paracord-server" "$backup"
+        # Back up whichever binary exists
+        _old_bin="mercury-server"
+        [ -f "$INSTALL_DIR/mercury-server" ] || _old_bin="paracord-server"
+        backup="$INSTALL_DIR/backups/${_old_bin}.$(date +%Y%m%d-%H%M%S)"
+        mv "$INSTALL_DIR/$_old_bin" "$backup"
         say "Previous binary backed up to $backup"
     else
         IS_UPGRADE=0
     fi
 
-    for f in paracord-server livekit-server; do
+    for f in mercury-server livekit-server; do
         [ -f "$stage/$f" ] && chmod 0755 "$stage/$f"
     done
-    for f in paracord-server livekit-server paracord.example.toml README.txt; do
+    for f in mercury-server livekit-server mercury.toml mercury.example.toml paracord.example.toml README.txt; do
         [ -f "$stage/$f" ] && mv "$stage/$f" "$INSTALL_DIR/$f"
     done
+    # Compat symlink: paracord-server -> mercury-server
+    if [ -f "$INSTALL_DIR/mercury-server" ]; then
+        ln -sfn mercury-server "$INSTALL_DIR/paracord-server"
+    fi
     rm -rf "$stage"
 
-    # Not a problem: voice and video run on Paracord's own media engine. The
+    # Not a problem: voice and video run on Archlast Mercury's own media engine. The
     # optional LiveKit companion is only needed by deployments that opt into it.
     [ -f "$INSTALL_DIR/livekit-server" ] || \
         say "Note: this build ships no optional LiveKit companion — voice and video do not need it."
 }
 
-# ── paracord system user (root installs) ─────────────────────────────────────
+# ── mercury system user (root installs, compat: paracord) ────────────────────
 
 ensure_service_user() {
     [ "$(id -u)" = "0" ] || return 0
@@ -411,25 +445,29 @@ run_init() {
     # competing sets of "next steps" is how a simple install starts to look
     # complicated. The output is kept and shown in full if `init` fails.
     init_log="$TMP_DIR/init.log"
-    init_cmd="\"$INSTALL_DIR/paracord-server\" -c \"$CONFIG_PATH\" init"
+    init_cmd="\"$INSTALL_DIR/mercury-server\" -c \"$CONFIG_PATH\" init"
+    # Compat fallback: if mercury-server not found, try paracord-server
+    [ -x "$INSTALL_DIR/mercury-server" ] || init_cmd="\"$INSTALL_DIR/paracord-server\" -c \"$CONFIG_PATH\" init"
     init_rc=0
     if [ "$(id -u)" = "0" ] && id "$RUN_USER" >/dev/null 2>&1; then
         if need_cmd runuser; then
-            (cd "$INSTALL_DIR" && runuser -u "$RUN_USER" -- ./paracord-server -c "$CONFIG_PATH" init) \
+            BIN="mercury-server"; [ -x "$INSTALL_DIR/mercury-server" ] || BIN="paracord-server"
+            (cd "$INSTALL_DIR" && runuser -u "$RUN_USER" -- ./$BIN -c "$CONFIG_PATH" init) \
                 >"$init_log" 2>&1 || init_rc=$?
         else
             (cd "$INSTALL_DIR" && su -s /bin/sh "$RUN_USER" -c "$init_cmd") \
                 >"$init_log" 2>&1 || init_rc=$?
         fi
     else
-        (cd "$INSTALL_DIR" && ./paracord-server -c "$CONFIG_PATH" init) \
+        BIN="mercury-server"; [ -x "$INSTALL_DIR/mercury-server" ] || BIN="paracord-server"
+        (cd "$INSTALL_DIR" && ./$BIN -c "$CONFIG_PATH" init) \
             >"$init_log" 2>&1 || init_rc=$?
     fi
     if [ "$init_rc" != "0" ]; then
         cat "$init_log" >&2
-        die "paracord-server init failed (exit $init_rc)"
+        die "mercury-server init failed (exit $init_rc)"
     fi
-    [ -f "$CONFIG_PATH" ] || { cat "$init_log" >&2; die "paracord-server init did not create $CONFIG_PATH"; }
+    [ -f "$CONFIG_PATH" ] || { cat "$init_log" >&2; die "mercury-server init did not create $CONFIG_PATH"; }
     say "Settings written to $CONFIG_PATH"
     absolutize_data_paths
     # sed -i above recreated the config as root; hand it back to the service user.
@@ -443,19 +481,23 @@ fix_ownership() {
 }
 
 link_binary() {
-    case "${PARACORD_LINK_DIR:-}" in
+    _ldir="${MERCURY_LINK_DIR:-${PARACORD_LINK_DIR:-}}"
+    case "${_ldir:-}" in
         "" )
             if [ "$(id -u)" = "0" ]; then LINK_DIR=/usr/local/bin; else LINK_DIR="$HOME/.local/bin"; fi ;;
         none|NONE|off)
             return 0 ;;
-        *) LINK_DIR="$PARACORD_LINK_DIR" ;;
+        *) LINK_DIR="$_ldir" ;;
     esac
     if mkdir -p "$LINK_DIR" 2>/dev/null && [ -w "$LINK_DIR" ]; then
-        ln -sfn "$INSTALL_DIR/paracord-server" "$LINK_DIR/paracord-server"
-        say "Linked $LINK_DIR/paracord-server -> $INSTALL_DIR/paracord-server"
+        # Prefer mercury-server; keep paracord-server compat symlink
+        _bin="mercury-server"; [ -f "$INSTALL_DIR/mercury-server" ] || _bin="paracord-server"
+        ln -sfn "$INSTALL_DIR/$_bin" "$LINK_DIR/mercury-server"
+        ln -sfn "$INSTALL_DIR/$_bin" "$LINK_DIR/paracord-server"
+        say "Linked $LINK_DIR/mercury-server -> $INSTALL_DIR/$_bin (compat: paracord-server)"
         case ":$PATH:" in
             *":$LINK_DIR:"*) ;;
-            *) warn "$LINK_DIR is not on PATH; run the server as $INSTALL_DIR/paracord-server" ;;
+            *) warn "$LINK_DIR is not on PATH; run the server as $INSTALL_DIR/mercury-server (compat: paracord-server)" ;;
         esac
     else
         warn "could not write $LINK_DIR — no PATH symlink created"
@@ -470,7 +512,7 @@ link_binary() {
 # (starts at login). `KeepAlive` is launchd's `Restart=always`.
 
 launchd_available() {
-    [ "${PARACORD_NO_SERVICE:-0}" = "1" ] && return 1
+    [ "${MERCURY_NO_SERVICE:-${PARACORD_NO_SERVICE:-0}}" = "1" ] && return 1
     [ "$OS_FAMILY" = "macos" ] || return 1
     need_cmd launchctl
 }
@@ -488,15 +530,15 @@ write_launchd_plist() {
     <key>Label</key><string>$LAUNCHD_LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$INSTALL_DIR/paracord-server</string>
+        <string>$INSTALL_DIR/mercury-server</string>
         <string>-c</string>
-        <string>$INSTALL_DIR/config/paracord.toml</string>
+        <string>$INSTALL_DIR/config/mercury.toml</string>
     </array>
     <key>WorkingDirectory</key><string>$INSTALL_DIR</string>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
-    <key>StandardOutPath</key><string>$INSTALL_DIR/logs/paracord.log</string>
-    <key>StandardErrorPath</key><string>$INSTALL_DIR/logs/paracord.err.log</string>
+    <key>StandardOutPath</key><string>$INSTALL_DIR/logs/mercury.log</string>
+    <key>StandardErrorPath</key><string>$INSTALL_DIR/logs/mercury.err.log</string>
 EOF
     if [ -n "$run_as" ]; then
         printf '    <key>UserName</key><string>%s</string>\n' "$run_as" >> "$plist"
@@ -518,7 +560,7 @@ install_launchd_service() {
         # leaving the old job definition resident.
         launchctl bootout system "$plist" >/dev/null 2>&1 || true
         SERVICE_DESC="launchd job '$LAUNCHD_LABEL' (starts with the computer)"
-        SERVICE_LOGS="$INSTALL_DIR/logs/paracord.log"
+        SERVICE_LOGS="$INSTALL_DIR/logs/mercury.log"
         if launchctl bootstrap system "$plist" 2>/dev/null; then
             SERVER_STARTED=1
             SERVICE_MANAGED=1
@@ -532,7 +574,7 @@ install_launchd_service() {
         write_launchd_plist "$plist" ""
         launchctl bootout "gui/$(id -u)" "$plist" >/dev/null 2>&1 || true
         SERVICE_DESC="launchd job '$LAUNCHD_LABEL' (starts when you log in)"
-        SERVICE_LOGS="$INSTALL_DIR/logs/paracord.log"
+        SERVICE_LOGS="$INSTALL_DIR/logs/mercury.log"
         if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
             SERVER_STARTED=1
             SERVICE_MANAGED=1
@@ -547,7 +589,7 @@ install_launchd_service() {
 # ── systemd ──────────────────────────────────────────────────────────────────
 
 systemd_available() {
-    [ "${PARACORD_NO_SYSTEMD:-0}" = "1" ] && return 1
+    [ "${MERCURY_NO_SYSTEMD:-${PARACORD_NO_SYSTEMD:-0}}" = "1" ] && return 1
     need_cmd systemctl || return 1
     [ -d /run/systemd/system ] || return 1
 }
@@ -563,7 +605,7 @@ write_system_unit() {
     unit="/etc/systemd/system/${SERVICE_NAME}.service"
     cat > "$unit" <<EOF
 [Unit]
-Description=Paracord Server
+Description=Archlast Mercury Server
 After=network-online.target
 Wants=network-online.target
 # Generated by scripts/install.sh — config and data live under $INSTALL_DIR.
@@ -573,7 +615,7 @@ Type=simple
 User=$RUN_USER
 Group=$RUN_USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/paracord-server -c $CONFIG_PATH
+ExecStart=$INSTALL_DIR/mercury-server -c $CONFIG_PATH
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
@@ -604,14 +646,14 @@ write_user_unit() {
     unit="$udir/${SERVICE_NAME}.service"
     cat > "$unit" <<EOF
 [Unit]
-Description=Paracord Server (user)
+Description=Archlast Mercury Server (user)
 After=network-online.target
 # Generated by scripts/install.sh — config and data live under $INSTALL_DIR.
 
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/paracord-server -c $CONFIG_PATH
+ExecStart=$INSTALL_DIR/mercury-server -c $CONFIG_PATH
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
@@ -885,7 +927,7 @@ setup_state() {
 maybe_open_browser() {
     BROWSER_OPENED=0
     [ -n "$CLAIM_LINK" ] || return 0
-    [ "${PARACORD_NO_BROWSER:-0}" = "1" ] && return 0
+    [ "${MERCURY_NO_BROWSER:-${PARACORD_NO_BROWSER:-0}}" = "1" ] && return 0
 
     if [ "$OS_FAMILY" = "macos" ]; then
         need_cmd open || return 0
@@ -935,6 +977,10 @@ resolve_version_label() {
     # Offline installs have no release tag; the archive name usually carries one.
     base="$(basename "${ARCHIVE_PATH:-}")"
     case "$base" in
+        "mercury-server-${PLATFORM}-"*.tar.gz)
+            base="${base%.tar.gz}"
+            VERSION_LABEL="${base#mercury-server-"${PLATFORM}"-}"
+            ;;
         "paracord-server-${PLATFORM}-"*.tar.gz)
             base="${base%.tar.gz}"
             VERSION_LABEL="${base#paracord-server-"${PLATFORM}"-}"
@@ -958,7 +1004,7 @@ print_details() {
         say "  Logs:      $SERVICE_LOGS"
     else
         say "  Service:   ${SERVICE_DESC:-nothing starts it automatically}; start it with"
-        say "             cd \"$INSTALL_DIR\" && ./paracord-server"
+        say "             cd \"$INSTALL_DIR\" && ./mercury-server  # compat: paracord-server also works"
     fi
     if [ "$WEB_PORT" = "$VOICE_PORT" ]; then
         say "  Ports:     $WEB_PORT (TCP for the app, UDP for voice and video)"
@@ -966,7 +1012,7 @@ print_details() {
         say "  Ports:     $WEB_PORT TCP (app), $VOICE_PORT UDP (voice and video)"
     fi
     say "  Address:   $SHARE_URL"
-    if [ "$(id -u)" != "0" ] && [ -z "${PARACORD_INSTALL_DIR:-}" ]; then
+    if [ "$(id -u)" != "0" ] && [ -z "${MERCURY_INSTALL_DIR:-${PARACORD_INSTALL_DIR:-}}" ]; then
         say "  Installed for you only. For every account on this computer, run the"
         say "  same command with sudo."
     fi
@@ -982,13 +1028,13 @@ print_summary() {
             upgrade_tail="."
         fi
         if [ -n "$VERSION_LABEL" ]; then
-            say "Paracord was updated to ${VERSION_LABEL}${upgrade_tail}"
+            say "Archlast Mercury was updated to ${VERSION_LABEL}${upgrade_tail}"
         else
-            say "Paracord was updated${upgrade_tail}"
+            say "Archlast Mercury was updated${upgrade_tail}"
         fi
         say "Your accounts, messages and settings are kept."
         if [ "$SERVER_STARTED" = "0" ]; then
-            say "Start it again with:  cd \"$INSTALL_DIR\" && ./paracord-server"
+            say "Start it again with:  cd \"$INSTALL_DIR\" && ./mercury-server  # compat: paracord-server also works"
         fi
         if [ -n "$CLAIM_LINK" ]; then
             say ""
@@ -1000,9 +1046,9 @@ print_summary() {
     fi
 
     if [ "$SERVER_STARTED" = "1" ]; then
-        say "Paracord is installed and running."
+        say "Archlast Mercury is installed and running."
     else
-        say "Paracord is installed."
+        say "Archlast Mercury is installed."
     fi
     say ""
 
@@ -1025,7 +1071,7 @@ print_summary() {
         fi
     else
         say "1. Start the server:"
-        say "     cd \"$INSTALL_DIR\" && ./paracord-server"
+        say "     cd \"$INSTALL_DIR\" && ./mercury-server  # compat: paracord-server"
         say "   It prints a link that finishes setting up - open that link in your browser."
     fi
     say "2. Then invite friends: open your server in the app and press Invite."
@@ -1045,10 +1091,10 @@ print_summary() {
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 main() {
-    TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t paracord-install)"
+    TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t mercury-install)"
     trap 'rm -rf "$TMP_DIR"' EXIT
 
-    say "Paracord server installer"
+    say "Archlast Mercury server installer (compat: Paracord)"
     # Said once, up front, in the words that matter to whoever is watching: what
     # this install covers and when the server will be running.
     if [ "$(id -u)" = "0" ]; then
@@ -1059,7 +1105,7 @@ main() {
     fi
     check_tools
     detect_platform
-    if [ -z "${PARACORD_LOCAL_ARCHIVE:-}" ]; then
+    if [ -z "${MERCURY_LOCAL_ARCHIVE:-${PARACORD_LOCAL_ARCHIVE:-}}" ]; then
         resolve_release
     fi
     acquire_archive
@@ -1067,7 +1113,7 @@ main() {
     choose_install_dir
     install_files
     ensure_service_user
-    # chown before `init` so the config it writes (as the paracord user) lands
+    # chown before `init` so the config it writes (as the mercury user) lands
     # in directories it can actually write into.
     fix_ownership
     run_init

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci_install_smoke.sh — end-to-end smoke test for the Paracord installers.
+# ci_install_smoke.sh — end-to-end smoke test for the Archlast Mercury installers.
 #
 # What it covers (all offline — no GitHub access required):
 #   1. bash/sh syntax + shellcheck (when installed) on scripts/install.sh
@@ -136,10 +136,10 @@ if [ -x "$REAL_BIN" ] && head -c 4 "$REAL_BIN" | grep -q ELF; then
     cp "$REAL_BIN" "$PKG/paracord-server"
     note "using real binary: $REAL_BIN"
 else
-    note "no target/release/paracord-server — packaging a stub binary"
+    note "no target/release/mercury-server — packaging a stub binary"
     cat > "$PKG/paracord-server" <<'STUB'
 #!/bin/sh
-# Test stub: emulates `paracord-server -c <path> init` — writes a config file
+# Test stub: emulates `mercury-server -c <path> init` — writes a config file
 # with the same ./data/ relative layout the real generator produces.
 cfg="config/paracord.toml"; do_init=0
 while [ $# -gt 0 ]; do
@@ -175,7 +175,7 @@ EOF
     echo "  Open / share:  https://127.0.0.1:8443"
     exit 0
 fi
-echo "stub paracord-server: no real service" >&2
+echo "stub mercury-server: no real service" >&2
 exit 0
 STUB
     chmod +x "$PKG/paracord-server"
@@ -243,7 +243,7 @@ assert_contains "$WORK/install1.log" "open your server in the app and press Invi
 assert_contains "$WORK/install1.log" "To update later, run this same command again" "ending says how to update"
 assert_contains "$WORK/install1.log" "Address:" "Details block prints the address"
 assert_contains "$WORK/install1.log" "$INST/config/paracord.toml" "Details block prints the settings path"
-# `paracord-server init` prints its own operator walkthrough; the installer
+# `mercury-server init` prints its own operator walkthrough; the installer
 # holds it back so there is exactly one set of closing instructions.
 if grep -qiE "claim token|Next steps" "$WORK/install1.log"; then
     fail "installer leaked the server's init walkthrough"

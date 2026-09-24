@@ -2,7 +2,7 @@
 """End-to-end smoke test for the SQLite -> PostgreSQL migrator.
 
 Seeds a freshly migrated temp SQLite database, runs
-`paracord-server migrate-to-postgres` against a live PostgreSQL service, and
+`mercury-server migrate-to-postgres` against a live PostgreSQL service, and
 asserts row counts, repaired tails, unchanged read state and a new history epoch.
 
 Source data is preserved except for derived channel tails and the target's
@@ -119,7 +119,7 @@ def apply_sqlite_migrations(db_path: Path) -> None:
 
 
 def build_server_binary() -> Path:
-    """Build paracord-server without the embedded UI (no client/dist needed for
+    """Build mercury-server without the embedded UI (no client/dist needed for
     the migrate-to-postgres subcommand)."""
     supplied = os.environ.get("PARACORD_MIGRATOR_BINARY")
     if supplied:

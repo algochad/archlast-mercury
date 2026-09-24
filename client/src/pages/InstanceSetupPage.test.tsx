@@ -123,7 +123,7 @@ describe('InstanceSetupPage', () => {
   it('distinguishes running the server from joining a community', async () => {
     renderPage();
 
-    expect(await screen.findByText('Set up your Paracord instance')).toBeInTheDocument();
+    expect(await screen.findByText('Set up your Archlast Mercury instance')).toBeInTheDocument();
     expect(
       screen.getByText(/This makes you the owner/),
     ).toBeInTheDocument();

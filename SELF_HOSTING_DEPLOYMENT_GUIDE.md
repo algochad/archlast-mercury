@@ -1,6 +1,6 @@
-# Paracord Self-Hosting Deployment Guide
+# Archlast Mercury Self-Hosting Deployment Guide
 
-This guide is the operator-facing reference for production deployments of Paracord.
+This guide is the operator-facing reference for production deployments of Archlast Mercury.
 It covers Docker Compose, systemd, reverse proxy/TLS, PostgreSQL, backups, monitoring, and optional S3-compatible object storage.
 
 ## 1. Production Baseline
@@ -10,45 +10,45 @@ It covers Docker Compose, systemd, reverse proxy/TLS, PostgreSQL, backups, monit
    prints a one-time claim token and writes it to `first-owner-claim.txt` beside
    the config (mode 0600); open `<public URL>/setup-server` and paste it to
    create the owner account, name the instance and open its first space. Pin the
-   token in advance with `[setup] claim_token` / `PARACORD_SETUP_CLAIM_TOKEN`
+   token in advance with `[setup] claim_token` / `MERCURY_SETUP_CLAIM_TOKEN`
    (minimum 32 characters) for provisioning systems. Set
-   `PARACORD_SETUP_REQUIRE_CLAIM=false` **only** for an unattended deployment
+   `MERCURY_SETUP_REQUIRE_CLAIM=false` **only** for an unattended deployment
    whose first account is created by a script you control — with it, the first
    account registered owns the instance, and the server logs a warning saying so.
 1. Use PostgreSQL for sustained multi-user production workloads.
-2. Keep Paracord behind a reverse proxy (nginx or caddy) with TLS.
-3. Run Paracord as a non-root user.
-4. Keep `PARACORD_JWT_SECRET`, federation signing key, and at-rest keys outside source control.
+2. Keep Archlast Mercury behind a reverse proxy (nginx or caddy) with TLS.
+3. Run Archlast Mercury as a non-root user.
+4. Keep `MERCURY_JWT_SECRET`, federation signing key, and at-rest keys outside source control.
 5. Back up both database and media volumes.
 
-## 2. Docker Compose (Paracord + PostgreSQL + LiveKit)
+## 2. Docker Compose (Archlast Mercury + PostgreSQL + LiveKit)
 
-> The shipped `docker-compose.yml` already contains the PostgreSQL service below as `profiles: ["postgres"]` with interpolation defaults (`PARACORD_DATABASE_URL=${…:-sqlite…}`), so the expanded example that follows is the same topology with the profile gate removed for clarity. Prefer `docker compose --profile postgres up -d` over copying this block.
+> The shipped `docker-compose.yml` already contains the PostgreSQL service below as `profiles: ["postgres"]` with interpolation defaults (`MERCURY_DATABASE_URL=${…:-sqlite…}`), so the expanded example that follows is the same topology with the profile gate removed for clarity. Prefer `docker compose --profile postgres up -d` over copying this block.
 ```yaml
 services:
-  paracord:
-    image: ghcr.io/YOUR_ORG/paracord:latest
+  mercury:
+    image: ghcr.io/YOUR_ORG/archlast-mercury:latest
     restart: unless-stopped
     environment:
-      PARACORD_BIND_ADDRESS: 0.0.0.0:8090
-      PARACORD_PUBLIC_URL: https://chat.example.com
-      PARACORD_TLS_ENABLED: "false"
-      PARACORD_DATABASE_ENGINE: postgres
-      PARACORD_DATABASE_URL: postgresql://paracord:${POSTGRES_PASSWORD}@postgres:5432/paracord
-      PARACORD_DATABASE_MAX_CONNECTIONS: 50
-      PARACORD_COOKIE_SECURE: "true"
-      PARACORD_TRUST_PROXY: "true"
-      PARACORD_TRUSTED_PROXY_IPS: 172.18.0.0/16
-      PARACORD_STORAGE_PATH: /data/uploads
-      PARACORD_MEDIA_STORAGE_PATH: /data/files
-      PARACORD_BACKUP_DIR: /data/backups
-      PARACORD_LIVEKIT_URL: ws://livekit:7880
-      PARACORD_LIVEKIT_HTTP_URL: http://livekit:7880
-      PARACORD_LIVEKIT_PUBLIC_URL: wss://chat.example.com/livekit
-      PARACORD_LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
-      PARACORD_LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      MERCURY_BIND_ADDRESS: 0.0.0.0:8090
+      MERCURY_PUBLIC_URL: https://chat.example.com
+      MERCURY_TLS_ENABLED: "false"
+      MERCURY_DATABASE_ENGINE: postgres
+      MERCURY_DATABASE_URL: postgresql://mercury:${POSTGRES_PASSWORD}@postgres:5432/mercury
+      MERCURY_DATABASE_MAX_CONNECTIONS: 50
+      MERCURY_COOKIE_SECURE: "true"
+      MERCURY_TRUST_PROXY: "true"
+      MERCURY_TRUSTED_PROXY_IPS: 172.18.0.0/16
+      MERCURY_STORAGE_PATH: /data/uploads
+      MERCURY_MEDIA_STORAGE_PATH: /data/files
+      MERCURY_BACKUP_DIR: /data/backups
+      MERCURY_LIVEKIT_URL: ws://livekit:7880
+      MERCURY_LIVEKIT_HTTP_URL: http://livekit:7880
+      MERCURY_LIVEKIT_PUBLIC_URL: wss://chat.example.com/livekit
+      MERCURY_LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      MERCURY_LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
     volumes:
-      - paracord-data:/data
+      - paracord-data (volume name unchanged for backward compat):/data
     depends_on:
       - postgres
       - livekit
@@ -59,9 +59,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: paracord
+      POSTGRES_USER: mercury
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: paracord
+      POSTGRES_DB: mercury
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
@@ -79,36 +79,36 @@ volumes:
   postgres-data:
 ```
 
-The example disables Paracord's built-in TLS because TLS is terminated at the reverse proxy. If you do not use a reverse proxy, configure the `[tls]` section directly and expose the HTTPS port instead.
+The example disables Archlast Mercury's built-in TLS because TLS is terminated at the reverse proxy. If you do not use a reverse proxy, configure the `[tls]` section directly and expose the HTTPS port instead.
 
 ## 3. systemd Service (Binary Deployment)
 
 The fastest route is the install script, which performs this entire section for
-you — it installs the release under `/opt/paracord`, creates the `paracord`
-system user, writes `config/paracord.toml`, and enables a hardened unit
+you — it installs the release under `/opt/archlast-mercury`, creates the `mercury`
+system user, writes `config/mercury.toml`, and enables a hardened unit
 (`Restart=always`, `NoNewPrivileges`, `ProtectSystem=strict` with the install
 dir writable):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.sh | sudo sh
 ```
 
 Re-running the same command upgrades the binary while preserving `config/` and
-`data/`. To do it by hand instead, create `/etc/systemd/system/paracord.service`:
+`data/`. To do it by hand instead, create `/etc/systemd/system/mercury.service`:
 
 ```ini
 [Unit]
-Description=Paracord Server
+Description=Archlast Mercury Server
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=paracord
-Group=paracord
-WorkingDirectory=/opt/paracord
-EnvironmentFile=/etc/paracord/paracord.env
-ExecStart=/opt/paracord/paracord-server --config /etc/paracord/paracord.toml
+User=mercury
+Group=mercury
+WorkingDirectory=/opt/archlast-mercury
+EnvironmentFile=/etc/archlast-mercury/mercury.env
+ExecStart=/opt/archlast-mercury/mercury-server --config /etc/archlast-mercury/mercury.toml
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65535
@@ -121,8 +121,8 @@ Activate:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now paracord
-sudo systemctl status paracord
+sudo systemctl enable --now mercury
+sudo systemctl status mercury
 ```
 
 ## 4. Reverse Proxy and TLS
@@ -168,7 +168,7 @@ chat.example.com {
 ### Let’s Encrypt
 
 Use certbot (nginx) or built-in caddy automation.
-If using Paracord ACME settings directly, configure the `[tls.acme]` section in `paracord.toml`.
+If using Archlast Mercury ACME settings directly, configure the `[tls.acme]` section in `mercury.toml`.
 
 ## 5. PostgreSQL Setup and SQLite Migration Path
 
@@ -179,7 +179,7 @@ Use:
 ```toml
 [database]
 engine = "postgres"
-url = "postgresql://paracord:STRONG_PASSWORD@localhost:5432/paracord?sslmode=prefer"
+url = "postgresql://mercury:STRONG_PASSWORD@localhost:5432/mercury?sslmode=prefer"
 max_connections = 50
 statement_timeout_secs = 30
 idle_in_transaction_timeout_secs = 60
@@ -189,14 +189,14 @@ maintenance_work_mem_mb = 64
 
 ### Existing SQLite instance
 
-Paracord does not include an automatic in-place SQLite->PostgreSQL data migrator.
+Archlast Mercury does not include an automatic in-place SQLite->PostgreSQL data migrator.
 Recommended path:
 
 1. Put server in maintenance mode.
 2. Export SQLite data with custom SQL scripts for your schema.
 3. Import into PostgreSQL.
 4. Switch `database.engine` + `database.url`.
-5. Start Paracord and verify migrations/health.
+5. Start Archlast Mercury and verify migrations/health.
 6. Keep the old SQLite file as rollback backup until cutover is validated.
 
 ## 6. Backups (Database + Media)
@@ -235,27 +235,27 @@ Alerting baseline:
 
 ## 8. Optional Object Storage Configuration
 
-Paracord stores uploads on the local filesystem by default. S3-compatible object
+Archlast Mercury stores uploads on the local filesystem by default. S3-compatible object
 storage is optional and only used when `storage_type = "s3"` and the server is
 built with the `s3` feature.
 
-Set in `paracord.toml`:
+Set in `mercury.toml`:
 
 ```toml
 [storage]
 storage_type = "s3"
 
 [s3]
-bucket = "paracord-uploads"
+bucket = "mercury-uploads"
 region = "us-east-1"
 endpoint_url = "https://s3.example.com" # optional custom S3-compatible endpoint
 force_path_style = true                  # optional (MinIO/R2/etc.)
 access_key_id = "..."
 secret_access_key = "..."
-# Optional. Defaults to false so Paracord does not read ambient AWS
+# Optional. Defaults to false so Archlast Mercury does not read ambient AWS
 # env/profile/SSO/instance-role credentials unless you explicitly opt in.
 use_aws_credential_chain = false
-prefix = "paracord/"
+prefix = "mercury/"
 presign_expiry_seconds = 3600
 ```
 
@@ -266,10 +266,12 @@ intentionally rely on AWS-managed credentials.
 
 ## 9. Security Checklist
 
-1. Set `PARACORD_COOKIE_SECURE=true`.
-2. Set `PARACORD_TRUST_PROXY=true` only behind a trusted reverse proxy.
-3. Restrict `PARACORD_TRUSTED_PROXY_IPS` to exact proxy CIDRs.
+1. Set `MERCURY_COOKIE_SECURE=true`.
+2. Set `MERCURY_TRUST_PROXY=true` only behind a trusted reverse proxy.
+3. Restrict `MERCURY_TRUSTED_PROXY_IPS` to exact proxy CIDRs.
 4. Rotate JWT/federation/secrets periodically.
-5. Enable malware scanning for uploads (`PARACORD_MALWARE_SCAN_BIN`) in untrusted communities.
-6. Claim the instance yourself before the address is reachable by anyone else, and delete `first-owner-claim.txt` once the claim is done (the token is already invalid, but the file has no further purpose). Do not set `PARACORD_SETUP_REQUIRE_CLAIM=false` on an internet-facing server unless a script you control registers the first account in the same automated step.
-7. Leave `PARACORD_AUTH_LOGIN_LEGACY_PARSER` and `PARACORD_AUTH_CHALLENGE_TOKEN` unset. These are development/testing escape hatches that MUST NOT be set in production: the first broadens login body parsing, and the second bypasses the auth-guard hard-block. Both weaken authentication and must never be present on an internet-facing server.
+5. Enable malware scanning for uploads (`MERCURY_MALWARE_SCAN_BIN`) in untrusted communities.
+6. Claim the instance yourself before the address is reachable by anyone else, and delete `first-owner-claim.txt` once the claim is done (the token is already invalid, but the file has no further purpose). Do not set `MERCURY_SETUP_REQUIRE_CLAIM=false` on an internet-facing server unless a script you control registers the first account in the same automated step.
+7. Leave `MERCURY_AUTH_LOGIN_LEGACY_PARSER` and `MERCURY_AUTH_CHALLENGE_TOKEN` unset. These are development/testing escape hatches that MUST NOT be set in production: the first broadens login body parsing, and the second bypasses the auth-guard hard-block. Both weaken authentication and must never be present on an internet-facing server.
+
+> **Note:** Env vars use `MERCURY_*` (deprecated alias `PARACORD_*` still works for one minor version).

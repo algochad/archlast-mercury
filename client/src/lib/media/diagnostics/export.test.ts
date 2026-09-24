@@ -118,7 +118,7 @@ describe('diagnosticsExportJson', () => {
 describe('diagnosticsExportText', () => {
   it('renders a readable, redacted summary', () => {
     const text = diagnosticsExportText(report());
-    expect(text).toContain('Paracord voice connection check');
+    expect(text).toContain('Archlast Mercury voice connection check');
     expect(text).toContain('Result: FAIL');
     expect(text).toContain('[FAIL] Voice connection');
     expect(text).toContain('code: TRANSPORT_TIMEOUT');

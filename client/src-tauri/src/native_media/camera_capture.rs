@@ -10,7 +10,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use super::session::NativeMediaSession;
 use super::{video_pipeline, MediaState};
-use paracord_transport::control::ControlMessage;
+use mercury_transport::control::ControlMessage;
 
 const EVENT_EVENT: &str = "native_camera_event";
 const CAMERA_CONSENT_TTL: Duration = Duration::from_secs(120);

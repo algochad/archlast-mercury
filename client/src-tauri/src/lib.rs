@@ -1574,10 +1574,16 @@ fn configure_linux_gstreamer_audio_backend() {}
 
 #[cfg(target_os = "linux")]
 fn linux_native_render_enabled() -> bool {
+    let raw = std::env::var("MERCURY_DISABLE_LINUX_NATIVE_RENDER")
+        .or_else(|_| {
+            std::env::var("MERCURY_DISABLE_LINUX_NATIVE_RENDER").or_else(|_| std::env::var("PARACORD_DISABLE_LINUX_NATIVE_RENDER")).map(|v| {
+                eprintln!("PARACORD_DISABLE_LINUX_NATIVE_RENDER is deprecated; use MERCURY_DISABLE_LINUX_NATIVE_RENDER");
+                v
+            })
+        })
+        .ok();
     !matches!(
-        std::env::var("PARACORD_DISABLE_LINUX_NATIVE_RENDER")
-            .ok()
-            .as_deref(),
+        raw.as_deref(),
         Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES")
     )
 }
@@ -1677,15 +1683,16 @@ fn linux_native_render_enabled() -> bool {
 /// two voice joins and not a single line about the microphone — not a failure
 /// that went unreported, but a report that had nowhere to go.
 ///
-/// `PARACORD_LOG` (else `RUST_LOG`) overrides the default filter.
+/// `MERCURY_LOG` (else `PARACORD_LOG`, else `RUST_LOG`) overrides the default filter.
 fn init_tracing() {
     use tracing_subscriber::EnvFilter;
-    let filter = std::env::var("PARACORD_LOG")
+    let filter = std::env::var("MERCURY_LOG")
+        .or_else(|_| std::env::var("PARACORD_LOG"))
         .or_else(|_| std::env::var("RUST_LOG"))
         .unwrap_or_else(|_| {
             // Loud enough that a microphone that will not open says so, quiet
             // enough that per-frame media paths do not drown the log.
-            "info,paracord_codec=info,paracord_transport=info,quinn=warn,rustls=warn".to_string()
+            "info,mercury_codec=info,mercury_transport=info,quinn=warn,rustls=warn".to_string()
         });
     let filter = EnvFilter::try_new(&filter).unwrap_or_else(|_| EnvFilter::new("info"));
     if tracing_subscriber::fmt()
@@ -1798,12 +1805,12 @@ pub fn run() {
                 let _ = commands::append_client_log(
                     app.handle().clone(),
                     format!(
-                        "{} [native-render] linux host disabled by PARACORD_DISABLE_LINUX_NATIVE_RENDER",
+                        "{} [native-render] linux host disabled by MERCURY_DISABLE_LINUX_NATIVE_RENDER",
                         chrono_like_timestamp_utc()
                     ),
                 );
                 eprintln!(
-                    "linux native render host disabled by PARACORD_DISABLE_LINUX_NATIVE_RENDER"
+                    "linux native render host disabled by MERCURY_DISABLE_LINUX_NATIVE_RENDER"
                 );
             }
             tray::setup_tray(app.handle())?;

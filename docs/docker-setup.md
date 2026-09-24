@@ -7,14 +7,14 @@
 docker compose up -d --build
 
 # View logs
-docker compose logs -f paracord
+docker compose logs -f mercury
 ```
 
 The server will be available over plain **HTTP** at `http://localhost:8090`.
 
 There is nothing to fill in. On first run the server generates a strong random
 `jwt_secret` (and self-signed media/TLS certs) and persists them to
-`/data/paracord.toml` on the `paracord-data` volume, then reuses the same file —
+`/data/mercury.toml` on the `paracord-data (volume name unchanged for backward compat)` volume, then reuses the same file —
 and the same secret — on every restart. Native QUIC/WebTransport voice is the
 default media path and needs no extra services. LiveKit is an opt-in fallback
 (see [LiveKit](#livekit-voicevideo) below).
@@ -28,11 +28,11 @@ default media path and needs no extra services. LiveKit is an opt-in fallback
 ```bash
 cp .env.example .env
 # set POSTGRES_PASSWORD (generate: openssl rand -hex 32), then uncomment the
-# PARACORD_DATABASE_ENGINE / PARACORD_DATABASE_URL / PARACORD_DATABASE_MAX_CONNECTIONS lines
+# MERCURY_DATABASE_ENGINE / MERCURY_DATABASE_URL / MERCURY_DATABASE_MAX_CONNECTIONS lines
 docker compose --profile postgres up -d
 ```
 
-The `postgres` service (`postgres:16-alpine`, `profiles: ["postgres"]`) stores data on the `pgdata` volume (`pgdata:/var/lib/postgresql/data`); `paracord-data` still holds config/uploads/media/backups. Access the database from the host with `docker compose --profile postgres exec postgres psql -U paracord -d paracord` (no host `5432` port is mapped by default). `docker compose down` keeps `pgdata`; `docker compose down -v` wipes it. The profile also composes with LiveKit: `docker compose --profile postgres --profile livekit up -d`. For production behind a reverse proxy or on Coolify, see [Deploying on Coolify](coolify.md).
+The `postgres` service (`postgres:16-alpine`, `profiles: ["postgres"]`) stores data on the `pgdata` volume (`pgdata:/var/lib/postgresql/data`); `paracord-data` still holds config/uploads/media/backups. Access the database from the host with `docker compose --profile postgres exec postgres psql -U mercury -d mercury` (no host `5432` port is mapped by default). `docker compose down` keeps `pgdata`; `docker compose down -v` wipes it. The profile also composes with LiveKit: `docker compose --profile postgres --profile livekit up -d`. For production behind a reverse proxy or on Coolify, see [Deploying on Coolify](coolify.md).
 
 
 ## No-clone quick start
@@ -43,19 +43,19 @@ GHCR, or build straight from the remote repository:
 
 ```bash
 curl -fsSL -o docker-compose.yml \
-  https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/docker-compose.yml
+  https://raw.githubusercontent.com/algochad/archlast-mercury/main/docker-compose.yml
 
 # Pull the prebuilt image published to GHCR by CI on each main-branch build:
-PARACORD_PULL_POLICY=missing docker compose up -d
+MERCURY_PULL_POLICY=missing docker compose up -d
 
 # …or build from the remote git context instead (slower, no image needed):
-PARACORD_BUILD_CONTEXT=https://github.com/Scdouglas1999/Paracord.git#main \
+MERCURY_BUILD_CONTEXT=https://github.com/algochad/archlast-mercury.git#main \
   docker compose up -d
 ```
 
 If the pull fails with `denied`/`not found`, the GHCR package is not marked
 public on your fork — either flip the package's visibility in GitHub settings,
-or use the `PARACORD_BUILD_CONTEXT` variant which needs no published image.
+or use the `MERCURY_BUILD_CONTEXT` variant which needs no published image.
 
 With neither override set, `docker compose up -d` in a checkout builds the local
 source exactly as before — the defaults (`pull_policy: build`, `build: .`) keep
@@ -63,7 +63,7 @@ existing behaviour unchanged.
 
 ## TLS & Voice
 
-By default the container serves **plain HTTP on port 8090** — `PARACORD_TLS_ENABLED=false`
+By default the container serves **plain HTTP on port 8090** — `MERCURY_TLS_ENABLED=false`
 in both the Dockerfile and `docker-compose.yml`. There is no built-in HTTPS on
 8443 inside Docker.
 
@@ -74,7 +74,7 @@ browser voice/screen-share until you put TLS in front of it. Two options:
 - **Reverse proxy (recommended):** terminate TLS at Caddy or nginx and proxy to
   `http://localhost:8090` (and `http://localhost:7880` for LiveKit). See the
   [Reverse Proxy (nginx)](#reverse-proxy-nginx) section below.
-- **Built-in TLS:** set `PARACORD_TLS_ENABLED=true` and mount certificates into
+- **Built-in TLS:** set `MERCURY_TLS_ENABLED=true` and mount certificates into
   the container.
 
 The native desktop client is unaffected and works over plain HTTP.
@@ -85,30 +85,30 @@ All configuration can be overridden via environment variables in `docker-compose
 
 | Variable | Default | Description |
 |---|---|---|
-| `PARACORD_BIND_ADDRESS` | `0.0.0.0:8090` | Server listen address |
-| `PARACORD_SERVER_NAME` | `localhost` | Server hostname |
-| `PARACORD_PUBLIC_URL` | (auto-detected) | Public URL for CORS and invite links |
-| `PARACORD_CORS_ALLOWED_ORIGINS` | (empty) | Extra browser origins allowed to make credentialed cross-origin calls — needed only so users of *another* browser-served Paracord can add this server (see [known limitations](known-limitations.md#multi-server-from-a-browser)) |
-| `PARACORD_DATABASE_ENGINE` | `sqlite` | Database engine (`sqlite` or `postgres`); set `postgres` with `--profile postgres` or a managed PG |
-| `PARACORD_DATABASE_MAX_CONNECTIONS` | `20` | Max database connections (recommend `50` on PostgreSQL) |
+| `MERCURY_BIND_ADDRESS` | `0.0.0.0:8090` | Server listen address |
+| `MERCURY_SERVER_NAME` | `localhost` | Server hostname |
+| `MERCURY_PUBLIC_URL` | (auto-detected) | Public URL for CORS and invite links |
+| `MERCURY_CORS_ALLOWED_ORIGINS` | (empty) | Extra browser origins allowed to make credentialed cross-origin calls — needed only so users of *another* browser-served Archlast Mercury can add this server (see [known limitations](known-limitations.md#multi-server-from-a-browser)) |
+| `MERCURY_DATABASE_ENGINE` | `sqlite` | Database engine (`sqlite` or `postgres`); set `postgres` with `--profile postgres` or a managed PG |
+| `MERCURY_DATABASE_MAX_CONNECTIONS` | `20` | Max database connections (recommend `50` on PostgreSQL) |
 | `POSTGRES_PASSWORD` | (unset, required with `--profile postgres`) | Password for the compose `postgres` service; the `postgres` container refuses to start when empty (no `:?` guard is used because Compose interpolates inactive-profile services too) |
-| `PARACORD_TRUST_PROXY` | `false` | Honor `X-Forwarded-For` from a reverse proxy (set `true` behind Traefik/nginx) |
-| `PARACORD_TRUSTED_PROXY_IPS` | (empty) | Proxy CIDRs trusted for `X-Forwarded-For` — never `*` |
-| `PARACORD_COOKIE_SECURE` | `false` | Secure cookies (set `true` behind HTTPS) |
-| `PARACORD_AUTO_PORT_FORWARD` | `true` | UPnP/NAT-PMP router mapping (set `false` behind a proxy / on a VPS) |
-| `PARACORD_HOST_BIND` | `127.0.0.1` | Host bind for the published `8090` port (set `0.0.0.0` for a Compose resource on Coolify) |
-| `PARACORD_JWT_SECRET` | auto-generated | Not set in Docker. The server generates and persists a random secret to `/data/paracord.toml` on first run and reuses it thereafter |
-| `PARACORD_VOICE_NATIVE_MEDIA` | `true` | Native QUIC/WebTransport voice (the default media path); no LiveKit required |
-| `PARACORD_REGISTRATION_ENABLED` | `true` | Allow new user registrations |
-| `PARACORD_STORAGE_PATH` | `/data/uploads` | File upload storage path |
-| `PARACORD_MEDIA_STORAGE_PATH` | `/data/files` | Media file storage path |
-| `PARACORD_BACKUP_DIR` | `/data/backups` | Backup storage directory |
-| `PARACORD_TLS_ENABLED` | `false` | Disable built-in TLS for the container HTTP quick start; terminate TLS at a reverse proxy in production |
-| `PARACORD_LIVEKIT_URL` | `ws://livekit:7880` | Internal LiveKit WebSocket URL (inert unless the `livekit` profile is active and native media is off) |
-| `PARACORD_LIVEKIT_HTTP_URL` | `http://livekit:7880` | Internal LiveKit HTTP URL |
-| `PARACORD_LIVEKIT_PUBLIC_URL` | (derived from server) | Public LiveKit URL for clients |
-| `PARACORD_LIVEKIT_API_KEY` | `paracordlocal` in compose | LiveKit API key id (not a secret); must match the LiveKit service |
-| `PARACORD_LIVEKIT_API_SECRET` | (unset/empty) | Shared LiveKit secret; read by both the paracord and livekit services. There is **no** built-in default — the server refuses to start with a missing/placeholder secret when LiveKit is actually in use. Set a strong random value in `.env` before enabling the `livekit` profile: `openssl rand -hex 32` |
+| `MERCURY_TRUST_PROXY` | `false` | Honor `X-Forwarded-For` from a reverse proxy (set `true` behind Traefik/nginx) |
+| `MERCURY_TRUSTED_PROXY_IPS` | (empty) | Proxy CIDRs trusted for `X-Forwarded-For` — never `*` |
+| `MERCURY_COOKIE_SECURE` | `false` | Secure cookies (set `true` behind HTTPS) |
+| `MERCURY_AUTO_PORT_FORWARD` | `true` | UPnP/NAT-PMP router mapping (set `false` behind a proxy / on a VPS) |
+| `MERCURY_HOST_BIND` | `127.0.0.1` | Host bind for the published `8090` port (set `0.0.0.0` for a Compose resource on Coolify) |
+| `MERCURY_JWT_SECRET` | auto-generated | Not set in Docker. The server generates and persists a random secret to `/data/mercury.toml` on first run and reuses it thereafter |
+| `MERCURY_VOICE_NATIVE_MEDIA` | `true` | Native QUIC/WebTransport voice (the default media path); no LiveKit required |
+| `MERCURY_REGISTRATION_ENABLED` | `true` | Allow new user registrations |
+| `MERCURY_STORAGE_PATH` | `/data/uploads` | File upload storage path |
+| `MERCURY_MEDIA_STORAGE_PATH` | `/data/files` | Media file storage path |
+| `MERCURY_BACKUP_DIR` | `/data/backups` | Backup storage directory |
+| `MERCURY_TLS_ENABLED` | `false` | Disable built-in TLS for the container HTTP quick start; terminate TLS at a reverse proxy in production |
+| `MERCURY_LIVEKIT_URL` | `ws://livekit:7880` | Internal LiveKit WebSocket URL (inert unless the `livekit` profile is active and native media is off) |
+| `MERCURY_LIVEKIT_HTTP_URL` | `http://livekit:7880` | Internal LiveKit HTTP URL |
+| `MERCURY_LIVEKIT_PUBLIC_URL` | (derived from server) | Public LiveKit URL for clients |
+| `MERCURY_LIVEKIT_API_KEY` | `mercurylocal` in compose | LiveKit API key id (not a secret); must match the LiveKit service |
+| `MERCURY_LIVEKIT_API_SECRET` | (unset/empty) | Shared LiveKit secret; read by both the mercury and livekit services. There is **no** built-in default — the server refuses to start with a missing/placeholder secret when LiveKit is actually in use. Set a strong random value in `.env` before enabling the `livekit` profile: `openssl rand -hex 32` |
 
 ## Volume Mounts
 
@@ -133,16 +133,16 @@ needs no TLS; browser voice requires TLS terminated in front of the container
 
 LiveKit is an **opt-in fallback** and is **not started by default** — native
 QUIC/WebTransport media is the default voice path. The `livekit` service lives in
-a Compose profile, so a plain `docker compose up` starts only `paracord`.
+a Compose profile, so a plain `docker compose up` starts only `mercury`.
 
 To run the LiveKit fallback:
 
 ```bash
-# Start paracord + livekit together
+# Start mercury + livekit together
 docker compose --profile livekit up -d
 
 # Route voice through LiveKit instead of native media by setting
-# PARACORD_VOICE_NATIVE_MEDIA=false on the paracord service.
+# MERCURY_VOICE_NATIVE_MEDIA=false on the mercury service.
 ```
 
 It pins `livekit/livekit-server:v1.9.11`, matching the bundled LiveKit version
@@ -159,14 +159,14 @@ LiveKit release.
 
 ### Production LiveKit Configuration
 
-Both the paracord and livekit services read `PARACORD_LIVEKIT_API_SECRET`. It has
-**no built-in default**: when the secret is empty the paracord service refuses to
+Both the mercury and livekit services read `MERCURY_LIVEKIT_API_SECRET`. It has
+**no built-in default**: when the secret is empty the mercury service refuses to
 start with LiveKit routed (and the `livekit` service gets an empty key). Set a
 strong random value in `.env` before enabling the profile:
 
 ```dotenv
 # .env
-PARACORD_LIVEKIT_API_SECRET=<openssl rand -hex 32>
+MERCURY_LIVEKIT_API_SECRET=<openssl rand -hex 32>
 ```
 
 To customize the key id or expose a public LiveKit URL, override in
@@ -174,8 +174,8 @@ To customize the key id or expose a public LiveKit URL, override in
 
 ```yaml
 environment:
-  - PARACORD_LIVEKIT_API_KEY=your-strong-api-key
-  - PARACORD_LIVEKIT_PUBLIC_URL=wss://chat.example.com/livekit
+  - MERCURY_LIVEKIT_API_KEY=your-strong-api-key
+  - MERCURY_LIVEKIT_PUBLIC_URL=wss://chat.example.com/livekit
 ```
 
 If you change the key id, update it on the LiveKit service too (the secret still
@@ -184,21 +184,21 @@ comes from the shared variable):
 ```yaml
 livekit:
   environment:
-    - "LIVEKIT_KEYS=your-strong-api-key: ${PARACORD_LIVEKIT_API_SECRET}"
+    - "LIVEKIT_KEYS=your-strong-api-key: ${MERCURY_LIVEKIT_API_SECRET}"
 ```
 
 ## Building Only the Server Image
 
 ```bash
-docker build -t paracord .
-docker run -p 8090:8090 -v paracord-data:/data paracord
+docker build -t archlast-mercury .
+docker run -p 8090:8090 -v paracord-data:/data archlast-mercury
 ```
 
 ## Reverse Proxy (nginx)
 
-When running behind a reverse proxy, disable TLS in Paracord and terminate TLS at the proxy:
+When running behind a reverse proxy, disable TLS in Archlast Mercury and terminate TLS at the proxy:
 
-The provided Dockerfile and `docker-compose.yml` already set `PARACORD_TLS_ENABLED=false` for this topology.
+The provided Dockerfile and `docker-compose.yml` already set `MERCURY_TLS_ENABLED=false` for this topology.
 
 ```nginx
 server {
@@ -212,7 +212,7 @@ server {
         proxy_pass http://localhost:8090;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        # Overwrite any client-supplied chain at the public edge. Paracord also
+        # Overwrite any client-supplied chain at the public edge. Archlast Mercury also
         # walks XFF from the trusted right edge, but this is useful defense in depth.
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -253,3 +253,5 @@ curl http://localhost:8090/api/v1/admin/backups \
 ```
 
 Backup files are stored in the `/data/backups` volume.
+
+> **Note:** Env vars use `MERCURY_*` (deprecated alias `PARACORD_*` still works for one minor version).

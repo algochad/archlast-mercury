@@ -8,7 +8,7 @@ Triage: group **B** of the QA fleet's open items (B1–B8), from
 
 Screenshots: `output/fix-round-b/` — `before/` is the release candidate as the
 reviewers found it, `after/` is the rebuilt binary. Both were taken against a
-real `paracord-server` on port 18340, seeded with two servers, four dark voice
+real `mercury-server` on port 18340, seeded with two servers, four dark voice
 channels, five text channels and three accounts, at 1440×900 and 400×844, in Night and
 Daylight.
 

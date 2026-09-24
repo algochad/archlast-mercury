@@ -8,7 +8,7 @@ monitoring, and S3 storage see the
 [Docker setup reference](docker-setup.md), and the baseline
 [deployment profiles](deployment-profiles.md).
 
-> **No secrets to hand-generate.** Paracord generates and persists its JWT signing
+> **No secrets to hand-generate.** Archlast Mercury generates and persists its JWT signing
 > secret (and self-signed certificates) on first run. You do not create a JWT
 > secret manually, and the default native QUIC media engine needs no LiveKit
 > credentials at all. LiveKit is optional; enable it only if you specifically need
@@ -20,13 +20,13 @@ For a dedicated Linux host, [`scripts/install.sh`](../scripts/install.sh) does
 the whole base install in one command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.sh | sudo sh
 ```
 
-It installs the latest release to `/opt/paracord`, creates a `paracord` system
-user, writes a hardened `paracord.service` systemd unit (`Restart=always`,
+It installs the latest release to `/opt/archlast-mercury`, creates a `mercury` system
+user, writes a hardened `mercury.service` systemd unit (`Restart=always`,
 `ProtectSystem=strict` with the install dir writable, no ambient privileges),
-generates `config/paracord.toml` via `paracord-server init`, and starts the
+generates `config/mercury.toml` via `mercury-server init`, and starts the
 service. Re-running it is the upgrade path: `config/` and `data/` are preserved
 and the previous binary lands in `backups/`. All paths inside the generated
 config are pinned to the install directory, so nothing depends on the process
@@ -34,13 +34,13 @@ working directory.
 
 On Windows, [`scripts/install.ps1`](../scripts/install.ps1) is the equivalent
 one-command path from *any* PowerShell window —
-`irm https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.ps1 | iex` —
-it elevates itself, installs under `%ProgramFiles%\Paracord`, registers an
+`irm https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.ps1 | iex` —
+it elevates itself, installs under `%ProgramFiles%\Archlast Mercury`, registers an
 auto-start scheduled task running as `SYSTEM` with crash restarts, and opens the
 inbound firewall for the configured app (TCP) and voice (UDP) ports.
 
 Both installers finish by opening the one-time setup link in a browser
-(`PARACORD_NO_BROWSER=1` only prints it), and the server asks the router to
+(`MERCURY_NO_BROWSER=1` only prints it), and the server asks the router to
 forward its ports by itself (`[network] auto_port_forward`, on by default;
 see [port-forwarding.md](port-forwarding.md)). On a server you expose
 deliberately behind a reverse proxy or a cloud firewall, turn that off.
@@ -53,20 +53,20 @@ real domain, proxy-terminated TLS, `public_url`, and optionally PostgreSQL.
 > SHA-256 checksums for the archives, so the installer verifies the download
 > only via TLS to the official GitHub releases and prints a prominent warning.
 > If you need out-of-band verification, download the archive yourself, check it,
-> and install with `PARACORD_LOCAL_ARCHIVE=<file>` (a sibling `<file>.sha256`
+> and install with `MERCURY_LOCAL_ARCHIVE=<file>` (a sibling `<file>.sha256`
 > is then verified when present).
 
 ## 1. TLS: terminate at a reverse proxy
 
 For a production deployment behind a domain name, terminate TLS at a reverse proxy
-(Caddy, nginx, or Traefik) and keep Paracord on a private upstream. Disable
-Paracord's built-in TLS in that setup so the proxy owns HTTPS:
+(Caddy, nginx, or Traefik) and keep Archlast Mercury on a private upstream. Disable
+Archlast Mercury's built-in TLS in that setup so the proxy owns HTTPS:
 
 ```bash
-PARACORD_TLS_ENABLED=false
+MERCURY_TLS_ENABLED=false
 ```
 
-Point the proxy at the Paracord HTTP port (`8090` by default). The proxy must
+Point the proxy at the Archlast Mercury HTTP port (`8090` by default). The proxy must
 forward WebSocket upgrades and the standard proxy headers (`Host`,
 `X-Forwarded-For`, `X-Forwarded-Proto`). See the
 [Self-Hosting Deployment Guide](../SELF_HOSTING_DEPLOYMENT_GUIDE.md#4-reverse-proxy-and-tls)
@@ -75,30 +75,30 @@ for ready-to-use nginx and Caddy configs.
 When the app runs behind a proxy, also set:
 
 ```bash
-PARACORD_COOKIE_SECURE=true
-PARACORD_TRUST_PROXY=true
-PARACORD_TRUSTED_PROXY_IPS=<exact proxy IPs or CIDRs>
+MERCURY_COOKIE_SECURE=true
+MERCURY_TRUST_PROXY=true
+MERCURY_TRUSTED_PROXY_IPS=<exact proxy IPs or CIDRs>
 ```
 
-Restrict `PARACORD_TRUSTED_PROXY_IPS` to your actual proxy addresses only — never
+Restrict `MERCURY_TRUSTED_PROXY_IPS` to your actual proxy addresses only — never
 leave it open. At the public edge, overwrite `X-Forwarded-For` with the socket
-client address instead of preserving an incoming client-supplied value. Paracord
+client address instead of preserving an incoming client-supplied value. Archlast Mercury
 walks multi-proxy chains from the trusted right edge, so internal trusted proxies
 may still append their immediate peer when a deliberate proxy chain is used.
 
-> If you prefer **not** to run a reverse proxy, keep Paracord's built-in TLS
+> If you prefer **not** to run a reverse proxy, keep Archlast Mercury's built-in TLS
 > enabled (the default for the binary): it auto-generates a self-signed
 > certificate and serves HTTPS on `8443`. For a trusted (non-self-signed)
-> certificate, configure ACME/Let's Encrypt under `[tls.acme]` in `paracord.toml`.
+> certificate, configure ACME/Let's Encrypt under `[tls.acme]` in `mercury.toml`.
 
 ## 2. Forward the native media UDP port
 
-Reverse proxies terminate TCP/HTTPS, but Paracord's native voice/video runs over
+Reverse proxies terminate TCP/HTTPS, but Archlast Mercury's native voice/video runs over
 **QUIC on UDP** and is **not** proxied through your HTTP reverse proxy. You must
 forward the native media UDP port directly to the server host at the firewall:
 
 - **Native media port:** `8443/udp` by default (the `[voice] port` value in
-  `paracord.toml`). Raw QUIC desktop clients and browser WebTransport both use it.
+  `mercury.toml`). Raw QUIC desktop clients and browser WebTransport both use it.
 - If your reverse proxy also serves HTTPS on `8443/tcp`, forwarding **`8443`
   over both TCP and UDP** covers everything with a single port number.
 
@@ -114,7 +114,7 @@ address twice and exits at startup). With the defaults those are:
 - **RTC mux:** `7882/udp` when native media is also enabled, otherwise your
   public signalling port.
 - **TURN relay:** the port after the RTC mux (`7883/udp` by default). Override
-  it with `[livekit] turn_udp_port` in `paracord.toml` if that port is taken.
+  it with `[livekit] turn_udp_port` in `mercury.toml` if that port is taken.
 - **TURN relay range:** the ten ports after TURN (`7884-7893/udp` by default).
 
 Forward all three to the server host. Native media (the default) needs none of
@@ -126,31 +126,31 @@ For any deployment reachable at a fixed hostname, set the canonical public origi
 so invite links, verification/reset emails, and CORS all use the right URL:
 
 ```bash
-PARACORD_PUBLIC_URL=https://chat.example.com
+MERCURY_PUBLIC_URL=https://chat.example.com
 ```
 
 This is auto-detected for local/LAN use, but internet-facing deployments behind a
 proxy should set it explicitly — verification and password-reset links are built
-only from `PARACORD_PUBLIC_URL` (or headers from a trusted proxy), never from a
+only from `MERCURY_PUBLIC_URL` (or headers from a trusted proxy), never from a
 client-supplied `Host` header.
 
-### Letting other Paracord servers' browser users connect to yours
+### Letting other Archlast Mercury servers' browser users connect to yours
 
-Paracord's multi-server sidebar lets someone signed in on one server add a second
+Archlast Mercury's multi-server sidebar lets someone signed in on one server add a second
 one. From the **desktop app** that always works: Tauri requests come from a fixed
 origin that is always allowed. From a **browser**, the connect probe and every later
 API call are cross-origin requests carrying credentials, and your server only answers
-those for an origin on its allowlist. `PARACORD_PUBLIC_URL` is on it automatically;
+those for an origin on its allowlist. `MERCURY_PUBLIC_URL` is on it automatically;
 add any other origin explicitly:
 
 ```bash
 # Comma-separated. Scheme + host + port, no trailing slash.
-PARACORD_CORS_ALLOWED_ORIGINS=https://friends.example.org,http://127.0.0.1:18240
+MERCURY_CORS_ALLOWED_ORIGINS=https://friends.example.org,http://127.0.0.1:18240
 ```
 
 The allowlist is closed by default on purpose. Reflecting whatever `Origin` arrives
 and answering `Access-Control-Allow-Credentials: true` would let any website a
-signed-in user visits drive their Paracord server with their session, so a
+signed-in user visits drive their Archlast Mercury server with their session, so a
 credentialed cross-origin request needs the operator to say the word. A browser user
 refused this way is told which host refused them and which setting fixes it.
 
@@ -162,19 +162,19 @@ PostgreSQL. Under Docker Compose the shipped `docker-compose.yml` already contai
 a profile-gated `postgres` service — no hand-written service needed:
 
 ```bash
-cp .env.example .env   # set POSTGRES_PASSWORD, uncomment the PARACORD_DATABASE_* lines
+cp .env.example .env   # set POSTGRES_PASSWORD, uncomment the MERCURY_DATABASE_* lines
 docker compose --profile postgres up -d
 ```
 
-On Coolify, prefer a managed PostgreSQL resource and point `PARACORD_DATABASE_URL`
+On Coolify, prefer a managed PostgreSQL resource and point `MERCURY_DATABASE_URL`
 at its internal URL (see [Deploying on Coolify](coolify.md) §4). Bare-metal equivalent:
-Paracord runs its PostgreSQL migration track automatically on startup. Already
+Archlast Mercury runs its PostgreSQL migration track automatically on startup. Already
 running on SQLite? The server ships a one-shot migrator:
 
 ```bash
-paracord-server migrate-to-postgres \
-  --source "sqlite://./data/paracord.db" \
-  --target "postgresql://paracord:PASSWORD@localhost:5432/paracord"
+mercury-server migrate-to-postgres \
+  --source "sqlite://./data/mercury.db" \
+  --target "postgresql://mercury:PASSWORD@localhost:5432/mercury"
 ```
 
 Stop the server first (the SQLite file must be idle); the copy runs inside a single
@@ -193,10 +193,10 @@ Back up both the database and the media, and validate restores on a staging node
 - **Database:** SQLite file snapshot, or `pg_dump`/`pg_restore` on PostgreSQL. The
   admin settings panel and API can trigger backups on either backend.
 - **Media, config & keys:** Retain `data/uploads`, `data/files`, the original
-  `paracord.toml` and deployment environment, the at-rest master key, and separate
+  `mercury.toml` and deployment environment, the at-rest master key, and separate
   TLS/federation key files. The config contains the JWT secret, not TLS key bytes.
 
-Use `paracord-server restore-backup` to prepare and verify a new SQLite directory
+Use `mercury-server restore-backup` to prepare and verify a new SQLite directory
 or isolated PostgreSQL database, then stop every old instance before activating
 its generated configuration. The admin panel provides downloads and offline
 instructions; it does not replace the running database. Follow the
@@ -217,15 +217,15 @@ large SFU-scale rooms. To enable it under Docker Compose:
 docker compose --profile livekit up -d
 ```
 
-Then turn off native media on the `paracord` service so voice routes through
+Then turn off native media on the `mercury` service so voice routes through
 LiveKit:
 
 ```bash
-PARACORD_VOICE_NATIVE_MEDIA=false
+MERCURY_VOICE_NATIVE_MEDIA=false
 ```
 
 The Compose files ship a working local LiveKit key/secret pair for development;
-override `PARACORD_LIVEKIT_API_SECRET` with a strong random value before exposing
+override `MERCURY_LIVEKIT_API_SECRET` with a strong random value before exposing
 LiveKit to a network. See [docs/docker-setup.md](docker-setup.md) and
 `docker-compose.yml` for the full LiveKit wiring.
 
@@ -239,7 +239,7 @@ proxy; native voice and video ride **QUIC on UDP**, straight to the server host.
 That is why a server can be perfectly healthy for chat and completely unusable
 for calls — and why "voice doesn't work" reports are rarely about voice.
 
-Paracord ships a guided check so a user can find the answer themselves. It is
+Archlast Mercury ships a guided check so a user can find the answer themselves. It is
 reached from **Settings → Voice & Video → Run connection check**, and it is
 offered directly on a failed join (the voice lobby's error state, and the toast
 shown when a DM call fails to start). It never joins a call and never changes an
@@ -277,10 +277,10 @@ that a user can send to you.
    operator's CA-issued TLS material terminates the *TCP* HTTPS listener and is
    never presented on the QUIC port. **There is nothing for you to install,
    renew or point a reverse proxy at here** — putting nginx, Caddy or Cloudflare
-   in front of Paracord changes nothing about it.
+   in front of Archlast Mercury changes nothing about it.
 
    Chromium accepts a pinned self-signed WebTransport certificate only when it
-   is ECDSA P-256 **and valid for at most 14 days**, so Paracord issues one
+   is ECDSA P-256 **and valid for at most 14 days**, so Archlast Mercury issues one
    valid for 13 days and rotates it roughly every 7 while the server runs. The
    start-up log names the fingerprint and expiry, and each rotation logs the new
    one:
@@ -294,7 +294,7 @@ that a user can send to you.
    Rotation does not drop calls: QUIC authenticates once at handshake, so live
    sessions continue and only new joins use the new certificate. Clients read the
    fingerprint fresh on every join and before every reconnect, so no user action
-   is needed. Do not pin this fingerprint anywhere outside Paracord — it is
+   is needed. Do not pin this fingerprint anywhere outside Archlast Mercury — it is
    correct for days, not forever.
 
    Firefox and Safari cannot pin a self-signed WebTransport certificate at all,
@@ -316,3 +316,5 @@ that a user can send to you.
 - [Deployment profiles](deployment-profiles.md) — baseline dev / single-node /
   testbed values.
 - [Known limitations](known-limitations.md) — current support boundaries.
+
+> **Note:** Env vars use `MERCURY_*` (deprecated alias `PARACORD_*` still works for one minor version).

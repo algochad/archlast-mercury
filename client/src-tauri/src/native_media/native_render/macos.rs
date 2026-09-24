@@ -35,7 +35,7 @@ use std::os::raw::{c_char, c_void};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use paracord_codec::video::DecodedFrameHandle;
+use mercury_codec::video::DecodedFrameHandle;
 use tauri::Manager;
 
 use super::{SurfaceGeometry, SurfaceId, VideoSurface};

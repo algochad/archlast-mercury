@@ -1,6 +1,6 @@
 # Getting Started
 
-Paracord has no company server in the middle. Somebody in your group runs the
+Archlast Mercury has no company server in the middle. Somebody in your group runs the
 server on a computer that stays on, and everyone else joins with an invite link.
 This page walks the person running the server through it. It takes a few minutes
 and there is nothing to configure by hand.
@@ -16,28 +16,28 @@ press **Create an account to join**, and you're in. (Or install the
 **Linux or macOS**, in a terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.sh | sh
 ```
 
 **Windows**, in any PowerShell window:
 
 ```powershell
-irm https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/algochad/archlast-mercury/main/scripts/install.ps1 | iex
 ```
 
 The installer downloads the latest release, sets the server up to start by
 itself, starts it, and **opens the link that finishes setup in your browser**
 (it prints the link too). If you used this option, skip to step 3.
 
-- On Windows it asks for administrator permission itself. Say yes and Paracord
+- On Windows it asks for administrator permission itself. Say yes and Archlast Mercury
   is installed for the whole computer, starts with it, and the firewall is
   opened so friends can connect. Say no and it installs just for you.
 - On Linux, run it with `sudo` for a whole-computer install with a system
   service; without it, it installs just for you and starts when you log in.
-- Running the same command again later **updates** Paracord. Your accounts,
+- Running the same command again later **updates** Archlast Mercury. Your accounts,
   messages and settings are kept.
-- `PARACORD_NO_BROWSER=1` prints the setup link without opening a browser.
-  Offline and pinned installs (`PARACORD_VERSION`, `PARACORD_LOCAL_ARCHIVE`) are
+- `MERCURY_NO_BROWSER=1` prints the setup link without opening a browser.
+  Offline and pinned installs (`MERCURY_VERSION`, `MERCURY_LOCAL_ARCHIVE`) are
   described in the header of `scripts/install.sh`.
 
 ### Option B — download a release
@@ -47,24 +47,24 @@ Grab the latest server build from the
 
 ```bash
 # Linux
-tar xzf paracord-server-linux-x64-*.tar.gz
-chmod +x paracord-server/paracord-server
-cd paracord-server
+tar xzf mercury-server-linux-x64-*.tar.gz
+chmod +x mercury-server/mercury-server
+cd mercury-server
 ```
 
-On Windows, download and extract `paracord-server-windows-x64-*.zip`.
+On Windows, download and extract `mercury-server-windows-x64-*.zip`.
 
 ### Option C — build from source
 
 ```bash
-git clone https://github.com/Scdouglas1999/Paracord.git
-cd Paracord
+git clone https://github.com/algochad/archlast-mercury.git
+cd archlast-mercury
 
 # Build the web UI, then the server (the UI is embedded in the binary)
 cd client && npm install && npm run build && cd ..
-cargo build --release --bin paracord-server
+cargo build --release --bin mercury-server
 
-# The binary is at target/release/paracord-server
+# The binary is at target/release/mercury-server
 ```
 
 ## 2. Run it
@@ -73,12 +73,12 @@ cargo build --release --bin paracord-server
 
 ```bash
 # Linux / macOS, from the directory containing the binary
-./paracord-server
+./mercury-server
 ```
 
 ```powershell
-# Windows: double-click paracord-server.exe, or from a terminal:
-.\paracord-server.exe
+# Windows: double-click mercury-server.exe, or from a terminal:
+.\mercury-server.exe
 ```
 
 The first time it runs, the server creates everything it needs — its settings
@@ -109,14 +109,14 @@ and is deleted once it has been used.
 ### Want to generate the config first?
 
 Run the one-shot initializer, read the printed instructions, then start the
-server. `init` writes `config/paracord.toml` if it's missing (it never overwrites
+server. `init` writes `config/mercury.toml` if it's missing (it never overwrites
 an existing config) and exits without starting anything:
 
 ```bash
-./paracord-server init            # write config + print next steps, then exit
-./paracord-server init -c /etc/paracord/paracord.toml   # use a custom config path
-./paracord-server                 # start the server
-./paracord-server -c /etc/paracord/paracord.toml        # start with a custom config path
+./mercury-server init            # write config + print next steps, then exit
+./mercury-server init -c /etc/archlast-mercury/mercury.toml   # use a custom config path
+./mercury-server                 # start the server
+./mercury-server -c /etc/archlast-mercury/mercury.toml        # start with a custom config path
 ```
 
 ## 3. Finish setting up
@@ -144,10 +144,10 @@ rather than reading it from the console — in the config:
 claim_token = "at-least-32-random-characters-here"
 ```
 
-or as `PARACORD_SETUP_CLAIM_TOKEN`. For a fully unattended deployment where a
+or as `MERCURY_SETUP_CLAIM_TOKEN`. For a fully unattended deployment where a
 script you control creates the first account, set `require_claim = false` (or
-`PARACORD_SETUP_REQUIRE_CLAIM=false`) and the **first account registered** owns
-the server, as older Paracord releases behaved. The server logs a warning when
+`MERCURY_SETUP_REQUIRE_CLAIM=false`) and the **first account registered** owns
+the server, as older Archlast Mercury releases behaved. The server logs a warning when
 it starts that way, because anyone who reaches it first would own it.
 
 ## 4. Invite your friends
@@ -155,7 +155,7 @@ it starts that way, because anyone who reaches it first would own it.
 Open your server and press **Invite**. It gives you a link to send, and says
 plainly who it will work for:
 
-- **Anyone** — your router let Paracord open the way in, or you have a public
+- **Anyone** — your router let Archlast Mercury open the way in, or you have a public
   address configured. Send the link to whoever you like.
 - **Only people on the same Wi-Fi** — your router refused. Friends elsewhere
   can't connect until one setting is changed on the router;
@@ -173,7 +173,7 @@ described above; the desktop app does not.
 
 ## Native media vs. LiveKit
 
-Paracord ships **two** media backends. You almost certainly want the default.
+Archlast Mercury ships **two** media backends. You almost certainly want the default.
 
 | | Native QUIC engine (default) | LiveKit SFU (optional) |
 |---|---|---|
@@ -195,10 +195,10 @@ through it:
 docker compose --profile livekit up -d
 ```
 
-Then set `PARACORD_VOICE_NATIVE_MEDIA=false` on the `paracord` service (see
+Then set `MERCURY_VOICE_NATIVE_MEDIA=false` on the `mercury` service (see
 `docker-compose.yml`, `.env.example`, and [docs/docker-setup.md](docker-setup.md)).
 For a binary deployment, set `native_media = false` under `[voice]` and configure
-the `[livekit]` section in `paracord.toml`.
+the `[livekit]` section in `mercury.toml`.
 
 ## A note on TLS (why HTTPS matters)
 

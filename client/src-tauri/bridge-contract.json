@@ -26,7 +26,9 @@
         "method": "GET",
         "body": null,
         "body_base64": null,
-        "headers": { "Authorization": "Bearer t" },
+        "headers": {
+          "Authorization": "Bearer t"
+        },
         "timeout_ms": null,
         "response_type": null
       }
@@ -38,9 +40,13 @@
       "req": {
         "url": "https://server.example/api/v1/channels/5/messages",
         "method": "POST",
-        "body": { "content": "hello" },
+        "body": {
+          "content": "hello"
+        },
         "body_base64": null,
-        "headers": { "Content-Type": "application/json" },
+        "headers": {
+          "Content-Type": "application/json"
+        },
         "timeout_ms": 30000,
         "response_type": null
       }
@@ -54,7 +60,9 @@
         "method": "POST",
         "body": null,
         "body_base64": "YT0xJmI9Mg==",
-        "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
         "timeout_ms": null,
         "response_type": null
       }
@@ -75,13 +83,16 @@
     },
     {
       "name": "multipart-upload",
-      "why": "Bug 5. A FormData handed to invoke() serialises to {} — it has no enumerable own properties — so every upload arrived as an empty JSON object and 400d.",
+      "why": "Bug 5. A FormData handed to invoke() serialises to {} \u2014 it has no enumerable own properties \u2014 so every upload arrived as an empty JSON object and 400d.",
       "command": "native_multipart",
       "req": {
         "url": "https://server.example/api/v1/guilds/7/emojis",
         "method": "POST",
         "parts": [
-          { "name": "name", "value": "party" },
+          {
+            "name": "name",
+            "value": "party"
+          },
           {
             "name": "image",
             "filename": "party.png",
@@ -89,7 +100,9 @@
             "data_base64": "iVBORw0KGgo="
           }
         ],
-        "headers": { "Content-Type": "multipart/form-data" },
+        "headers": {
+          "Content-Type": "multipart/form-data"
+        },
         "timeout_ms": null
       }
     },
@@ -108,7 +121,9 @@
             "data_base64": "AAECAw=="
           }
         ],
-        "headers": { "Content-Type": "multipart/form-data" },
+        "headers": {
+          "Content-Type": "multipart/form-data"
+        },
         "timeout_ms": 120000
       }
     },
@@ -121,7 +136,9 @@
         "filename": "photo.jpg",
         "content_type": "image/jpeg",
         "data_base64": "/9j/4AAQ",
-        "headers": { "Authorization": "Bearer t" },
+        "headers": {
+          "Authorization": "Bearer t"
+        },
         "timeout_ms": 120000
       }
     },
@@ -131,7 +148,9 @@
       "command": "native_download_file",
       "req": {
         "url": "https://server.example/api/v1/attachments/9",
-        "headers": { "Authorization": "Bearer t" },
+        "headers": {
+          "Authorization": "Bearer t"
+        },
         "timeout_ms": 120000
       }
     }
@@ -142,10 +161,12 @@
       "why": "Bug 1. native_fetch returned only status and body, so the operation context compared an absent X-Paracord-History-Epoch against the captured one, called every response a history change, and tore down the realtime stream.",
       "response": {
         "status": 200,
-        "body": { "id": "42" },
+        "body": {
+          "id": "42"
+        },
         "headers": {
           "content-type": "application/json",
-          "x-paracord-history-epoch": "7257b8f7-610e-4a8b-a20c-5a94a7b98428"
+          "x-mercury-history-epoch": "7257b8f7-610e-4a8b-a20c-5a94a7b98428"
         }
       }
     },
@@ -155,7 +176,9 @@
       "response": {
         "status": 502,
         "body": "<html>bad gateway</html>",
-        "headers": { "content-type": "text/html" }
+        "headers": {
+          "content-type": "text/html"
+        }
       }
     }
   ],
@@ -163,12 +186,22 @@
     {
       "name": "media-token-claims-string-sub",
       "why": "Bug 3. The server mints `sub` as a JSON string because a snowflake is past 2^53. The desktop declared it i64 and every native voice join failed with \"invalid type: string\".",
-      "claims": { "sub": "357881425447358464", "exp": 1800000000, "sid": "s1", "room": "r1" }
+      "claims": {
+        "sub": "357881425447358464",
+        "exp": 1800000000,
+        "sid": "s1",
+        "room": "r1"
+      }
     },
     {
       "name": "media-token-claims-number-sub",
       "why": "An older server still sends a bare number; both shapes must read.",
-      "claims": { "sub": 357881425447358464, "exp": 1800000000, "sid": "s1", "room": "r1" }
+      "claims": {
+        "sub": 357881425447358464,
+        "exp": 1800000000,
+        "sid": "s1",
+        "room": "r1"
+      }
     }
   ],
   "secure_store_keys": [

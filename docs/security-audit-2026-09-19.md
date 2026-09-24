@@ -40,7 +40,7 @@ Additional inspected boundaries included backup archive extraction and expansion
 | Webhook write controls — High | Webhook sends/edits could evade creator visibility or timeout restrictions; edits bypassed AutoMod, and locked threads accepted sends. | Recheck creator access; apply the common timeout guard to sends and edits; evaluate edit content with AutoMod; apply thread locks and normal archived-thread revival. Timeout deletion remains allowed, matching ordinary messages. |
 | Rejected webhook edits — Medium | Invalid embeds could return an error after persisting the content edit. | Validate the complete request before mutating content. Tests assert rejected edits leave stored content unchanged and valid combined edits work. |
 
-Primary evidence: `crates/paracord-core/src/permissions.rs`, `crates/paracord-db/src/{mfa,users,password_reset}.rs`, `crates/paracord-api/tests/{auth_key_credential_hardening,security_route_authz_regressions,srv_api6_account_bot_authz,security_webhook_delivery}.rs`.
+Primary evidence: `crates/mercury-core/src/permissions.rs`, `crates/mercury-db/src/{mfa,users,password_reset}.rs`, `crates/mercury-api/tests/{auth_key_credential_hardening,security_route_authz_regressions,srv_api6_account_bot_authz,security_webhook_delivery}.rs`.
 
 ### Federation and server-side fetching
 
@@ -60,7 +60,7 @@ Primary evidence: `crates/paracord-core/src/permissions.rs`, `crates/paracord-db
 | Event IDs and quotas — Medium | An origin could squat another origin's event IDs; alternate encodings could fragment per-origin user-creation limits. | Bind event identity to origin and normalize quota subjects. Preserve signed zero-depth envelopes instead of rewriting authenticated bytes. |
 | Server-side URL fetching — High | Environment proxies could bypass DNS pinning; some special/translated IP ranges were not rejected; DNS resolution lacked its own timeout. | Disable proxy inheritance on these pinned clients, bound DNS lookup time, reject private/special destinations including embedded IPv4 forms, and retain permitted public destinations. Federation and OpenGraph tests cover the address policy. |
 
-Primary evidence: `crates/paracord-federation/src/{client,signing}.rs`, `crates/paracord-api/src/routes/federation.rs`, `crates/paracord-api/src/opengraph.rs`, and `crates/paracord-api/tests/security_federation_deep_audit.rs`.
+Primary evidence: `crates/mercury-federation/src/{client,signing}.rs`, `crates/mercury-api/src/routes/federation.rs`, `crates/mercury-api/src/opengraph.rs`, and `crates/mercury-api/tests/security_federation_deep_audit.rs`.
 
 ### Realtime delivery, storage, and TLS
 
@@ -72,7 +72,7 @@ Primary evidence: `crates/paracord-federation/src/{client,signing}.rs`, `crates/
 | Federated cache encryption — Medium | Downloaded federation files were cached in plaintext despite attachment at-rest encryption. | Encrypt cached blobs with scope-bound AAD and decrypt authenticated cache hits. Legacy policy violations trigger refetching. |
 | TLS startup — High | Certificate setup failure silently changed configured HTTPS into HTTP. | Fail startup with an explicit error. Process-level tests cover missing certificates, malformed certificates, successful CA-verified HTTPS, and redirects. |
 
-Primary evidence: `crates/paracord-core/src/events.rs`, `crates/paracord-ws/tests/gateway_integration.rs`, `crates/paracord-api/tests/{realtime_sse_resume,security_attachment_encryption}.rs`, and `crates/paracord-server/src/main.rs`.
+Primary evidence: `crates/mercury-core/src/events.rs`, `crates/mercury-ws/tests/gateway_integration.rs`, `crates/mercury-api/tests/{realtime_sse_resume,security_attachment_encryption}.rs`, and `crates/mercury-server/src/main.rs`.
 
 ### Browser and native cryptography/media
 
@@ -89,7 +89,7 @@ Primary evidence: `crates/paracord-core/src/events.rs`, `crates/paracord-ws/test
 | QUIC federation authentication — High | Signed Hello messages were reusable on another connection/destination because they omitted role and channel binding. | Sign a domain-separated canonical transcript containing role and the TLS exporter binding; reject out-of-window future timestamps and malformed Unicode hex safely. Real pinned QUIC handshakes and bidirectional datagrams are tested. |
 | Reusable transfer helpers — Medium, dormant | Shared helper filesystem names and incomplete upload completion were insufficiently constrained. | Validate filesystem identifiers, reserve active transfers atomically, bound resume/size accounting, require complete uploads, and drain buffered frames. Bind download IDs and ranges to supplied data. The download helper explicitly requires caller authorization; it does not define a new token scheme. |
 
-Primary evidence: `client/src/lib/{media/senderKeys,crypto/doubleRatchet,media/transport/fileTransfer}.ts`, `client/src-tauri/src/native_media/{commands,file_transfer}.rs`, `crates/paracord-codec/src/{crypto,video/decoder,video/lavc/decoder}.rs`, and `crates/paracord-transport/src/{federation,file_transfer}.rs`.
+Primary evidence: `client/src/lib/{media/senderKeys,crypto/doubleRatchet,media/transport/fileTransfer}.ts`, `client/src-tauri/src/native_media/{commands,file_transfer}.rs`, `crates/mercury-codec/src/{crypto,video/decoder,video/lavc/decoder}.rs`, and `crates/mercury-transport/src/{federation,file_transfer}.rs`.
 
 ## Dependencies
 
@@ -117,7 +117,7 @@ The three soundness warnings are `glib 0.18.5` (GTK/Tauri's `VariantStrIter`), `
 | Invite rate-counter transactions | 4 DB tests passed, including concurrent duplicate accounting and rollback fault injection. |
 | Temporary running server HTTP checks | 9 security smoke assertions passed; 300 malformed-request iterations produced no 5xx responses. The tested executable was the debug server build. These probes are not coverage-guided fuzzing. |
 | Temporary running server TLS checks | Missing and malformed certificates: nonzero exit and no HTTP/HTTPS listeners. Valid generated certificate: CA-verified HTTPS health and HTTP redirect passed. |
-| Final server executable | `cargo build -p paracord-server -j 2` passed after the final invite fix. The HTTP/TLS smoke runs preceded that isolated invite change; its affected suite then passed on both database engines. |
+| Final server executable | `cargo build -p mercury-server -j 2` passed after the final invite fix. The HTTP/TLS smoke runs preceded that isolated invite change; its affected suite then passed on both database engines. |
 | Migration sanity | 102 SQLite migrations applied; 103 PostgreSQL migrations passed parity checks. Actual PostgreSQL route tests are separate from this static/parity gate. |
 | Dependency audit | npm: zero vulnerabilities. Cargo: zero non-exempt vulnerabilities, with the unresolved advisory warnings described above. |
 | Rust lint and formatting | Final `cargo clippy --workspace -j 2 -- -D warnings` and `cargo fmt --all -- --check` passed. Whitespace checks passed with the repository's existing CRLF files preserved. |

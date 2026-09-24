@@ -45,7 +45,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use gtk::prelude::*;
-use paracord_codec::video::{ColorSpace, DecodedFrameHandle, PixelFormat};
+use mercury_codec::video::{ColorSpace, DecodedFrameHandle, PixelFormat};
 
 use super::{SurfaceGeometry, SurfaceId, VideoSurface};
 

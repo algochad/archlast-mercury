@@ -517,7 +517,7 @@ function inARoom(person: PersonLight): boolean {
   return person.live || person.roomName != null;
 }
 
-/** Paracord snowflake → ms, without throwing on anything that is not one. */
+/** Archlast Mercury snowflake → ms, without throwing on anything that is not one. */
 function snowflakeMs(id: string): number | null {
   if (!/^\d{1,19}$/.test(id)) return null;
   try {

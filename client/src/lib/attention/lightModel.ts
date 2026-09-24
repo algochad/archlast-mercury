@@ -1,7 +1,7 @@
 /**
  * The light vocabulary, as data (docs/lantern-stage-spec.md §0, §1.2, §1.5).
  *
- * Paracord is a building at night, and light means people. This module is the
+ * Archlast Mercury is a building at night, and light means people. This module is the
  * single place the three models are written down:
  *
  *   - {@link RoomLight}   — one window: dark, white (talking) or amber (reading).

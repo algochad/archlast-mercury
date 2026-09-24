@@ -15,13 +15,13 @@ use tokio::time::{timeout, Duration};
 use super::audio_actor::AudioActor;
 use super::capabilities::{detect_media_stream_capabilities, MediaStreamCapabilities};
 use super::stream_registry::StreamRegistry;
-use paracord_codec::audio::jitter::JitterBuffer;
-use paracord_codec::audio::opus::OpusDecoder;
-use paracord_codec::crypto::{FrameDecryptor, FrameEncryptor};
-use paracord_transport::connection::MediaConnection;
-use paracord_transport::control::ControlMessage;
-use paracord_transport::endpoint::MediaEndpoint;
-use paracord_transport::stream::{PublishedTrack, StreamId, TrackId, VideoCodecCapability};
+use mercury_codec::audio::jitter::JitterBuffer;
+use mercury_codec::audio::opus::OpusDecoder;
+use mercury_codec::crypto::{FrameDecryptor, FrameEncryptor};
+use mercury_transport::connection::MediaConnection;
+use mercury_transport::control::ControlMessage;
+use mercury_transport::endpoint::MediaEndpoint;
+use mercury_transport::stream::{PublishedTrack, StreamId, TrackId, VideoCodecCapability};
 
 const DNS_RESOLVE_TIMEOUT: Duration = Duration::from_secs(5);
 const QUIC_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -52,14 +52,14 @@ pub fn spawn_capture_forwarder(
 
 #[cfg(feature = "vpx")]
 pub struct NativeSimulcastState {
-    pub encoder: paracord_codec::video::encoder::SimulcastEncoder,
+    pub encoder: mercury_codec::video::encoder::SimulcastEncoder,
     pub input_width: u32,
     pub input_height: u32,
     pub layers: Vec<(
-        paracord_codec::video::SimulcastLayer,
-        paracord_codec::video::EncoderConfig,
+        mercury_codec::video::SimulcastLayer,
+        mercury_codec::video::EncoderConfig,
     )>,
-    pub codec: paracord_codec::video::VideoCodec,
+    pub codec: mercury_codec::video::VideoCodec,
     pub backend_name: &'static str,
     pub hardware_accelerated: bool,
     pub ssrcs: Vec<(u8, u32)>,
@@ -168,26 +168,26 @@ pub struct NativeMediaSession {
 
     // Video encoders (optional, behind feature gate)
     #[cfg(feature = "vpx")]
-    pub video_encoder: Option<Box<dyn paracord_codec::video::encoder::VideoEncoder>>,
+    pub video_encoder: Option<Box<dyn mercury_codec::video::encoder::VideoEncoder>>,
     #[cfg(feature = "vpx")]
     pub video_simulcast: Option<NativeSimulcastState>,
     #[cfg(feature = "vpx")]
-    pub screen_encoder: Option<Box<dyn paracord_codec::video::encoder::VideoEncoder>>,
+    pub screen_encoder: Option<Box<dyn mercury_codec::video::encoder::VideoEncoder>>,
     #[cfg(feature = "vpx")]
     pub screen_simulcast: Option<NativeSimulcastState>,
     #[cfg(feature = "vpx")]
-    pub screen_encoder_config: Option<paracord_codec::video::EncoderConfig>,
+    pub screen_encoder_config: Option<mercury_codec::video::EncoderConfig>,
     #[cfg(feature = "vpx")]
-    pub screen_encoder_codec: Option<paracord_codec::video::VideoCodec>,
+    pub screen_encoder_codec: Option<mercury_codec::video::VideoCodec>,
     // Camera-encoder configuration mirroring the screen fields above. The camera
     // path is split into the same begin/run/finish phases (see
     // `video_pipeline::{begin,run,finish}_camera_frame`), so it needs the same
     // per-stream config/codec/generation snapshot state that lets the heavy
     // encode run with the session lock released.
     #[cfg(feature = "vpx")]
-    pub video_encoder_config: Option<paracord_codec::video::EncoderConfig>,
+    pub video_encoder_config: Option<mercury_codec::video::EncoderConfig>,
     #[cfg(feature = "vpx")]
-    pub video_encoder_codec: Option<paracord_codec::video::VideoCodec>,
+    pub video_encoder_codec: Option<mercury_codec::video::VideoCodec>,
     /// Reusable buffer for RGBA→I420 conversion before VP9 encoding.
     #[cfg(feature = "vpx")]
     pub i420_convert_buf: Vec<u8>,
@@ -360,7 +360,7 @@ impl NativeMediaSession {
         room_id: &str,
         advertised_capabilities: Option<MediaStreamCapabilities>,
     ) -> Result<Self, String> {
-        use paracord_transport::connection::ConnectionMode;
+        use mercury_transport::connection::ConnectionMode;
 
         // Create a client-only QUIC endpoint
         let bind_addr: std::net::SocketAddr = "0.0.0.0:0"
@@ -668,10 +668,10 @@ struct MediaTokenClaims {
     /// The account. The server mints this as a JSON **string** (a snowflake is
     /// past 2^53, so a bare number would round in a browser); older servers
     /// still send a bare number. Read either shape, exactly like
-    /// `paracord_transport::connection::MediaClaims` does — a plain `i64` here
+    /// `mercury_transport::connection::MediaClaims` does — a plain `i64` here
     /// made every native join fail with "token claims parse failed: invalid
     /// type: string".
-    #[serde(with = "paracord_transport::wire_id")]
+    #[serde(with = "mercury_transport::wire_id")]
     sub: i64,
     #[allow(dead_code)]
     exp: Option<usize>,

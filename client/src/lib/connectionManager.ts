@@ -2137,7 +2137,7 @@ class ConnectionManager {
     // hardcoded `http://localhost:8080` when nothing is configured, which in
     // the desktop client is always: it has no stored URL and its own origin is
     // `tauri://`. Handing that to the shell asks the user to trust a server
-    // they never added and that is not running — a modal "Trust new Paracord
+    // they never added and that is not running — a modal "Trust new Archlast Mercury
     // server?" prompt at every cold boot, and sixty seconds of a client that
     // cannot connect while it waits for an answer nobody knows to give.
     // One entry per server: the shell issues a real `/health` GET for every URL

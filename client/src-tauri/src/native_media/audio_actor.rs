@@ -20,9 +20,9 @@ use std::thread::JoinHandle;
 
 use tokio::sync::{mpsc, oneshot};
 
-use paracord_codec::audio::aec::{ReferenceConsumer, ReferenceRing, REFERENCE_RING_CAPACITY};
-use paracord_codec::audio::capture::AudioCapture;
-use paracord_codec::audio::playback::AudioPlayback;
+use mercury_codec::audio::aec::{ReferenceConsumer, ReferenceRing, REFERENCE_RING_CAPACITY};
+use mercury_codec::audio::capture::AudioCapture;
+use mercury_codec::audio::playback::AudioPlayback;
 
 /// 20 ms PCM f32 mono frame at 48 kHz, as produced/consumed by the codec layer.
 type PcmFrame = Vec<f32>;

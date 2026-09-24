@@ -218,7 +218,7 @@ async function connectWithAttemptTimeout(room: Room, owner: CallSession, url: st
 /**
  * Whether the platform has OS-level process audio exclusion for loopback capture.
  * Tauri on Windows uses the WASAPI Process Loopback Exclusion API (Windows 10 2004+)
- * which captures all system audio EXCEPT Paracord's own process tree.
+ * which captures all system audio EXCEPT Archlast Mercury's own process tree.
  * On all other platforms (browser, Tauri+Linux, Tauri+macOS) we must suppress
  * voice element playback during streaming to prevent echo.
  */

@@ -141,7 +141,8 @@ function authHeaders(targetUrl: string): Record<string, string> {
     headers.Authorization = `Bearer ${token}`;
     const csrf = getCsrfToken();
     if (csrf) {
-      headers['X-Paracord-CSRF'] = csrf;
+      headers['X-Mercury-CSRF'] = csrf;
+      headers['X-Paracord-CSRF'] = csrf; // compat: deprecated Paracord header
     }
   }
   return headers;

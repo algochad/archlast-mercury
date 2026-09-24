@@ -1,0 +1,210 @@
+# Archlast Mercury Server Configuration
+# Generated automatically on first run. Edit as needed.
+
+[server]
+bind_address = "0.0.0.0:8090"
+server_name = "mercury"
+permission_cache_max_entries = 10000
+# Set explicitly for internet-facing deployments:
+# public_url = "https://your-domain-or-ip:8443"
+
+[database]
+engine = "sqlite"
+url = "sqlite://./data/mercury.db?mode=rwc"
+# Connection pool size. Every in-flight handler holds one connection for as long
+# as it is querying, so this is also the cap on concurrent database work: set it
+# too low and a handful of slow requests starve everything else. Waiting for a
+# free slot is bounded (5s) rather than queued indefinitely.
+max_connections = 20
+# Optional PostgreSQL per-connection tuning (0 keeps server defaults).
+work_mem_mb = 0
+maintenance_work_mem_mb = 0
+
+[auth]
+jwt_secret = "923859e820851b6abe69a9e624621c4b280df0572fb78c1ff118b1136afedff7"
+jwt_expiry_seconds = 900
+registration_enabled = true
+# Allow username logins for password auth (in addition to email).
+allow_username_login = true
+# Require email during password registration.
+require_email = false
+
+[setup]
+# Require the first-owner claim. While an instance is unclaimed nobody can
+# register: the operator finishes setup in the browser using the one-time claim
+# token this server prints on startup (and writes to first-owner-claim.txt next
+# to this file). That is what stops a stranger who finds a freshly exposed
+# server from becoming its administrator.
+#
+# Set to false ONLY for automated or unattended deployments where the first
+# account is created by a script you control: the first account registered then
+# owns the instance, exactly as older Paracord releases behaved.
+require_claim = true
+# Pin the bootstrap claim token instead of letting the server mint one. Useful
+# for provisioning systems and end-to-end harnesses. Minimum 32 characters; it
+# is stored hashed, never in plaintext.
+# claim_token = "replace-with-at-least-32-random-characters"
+
+[storage]
+# Upload storage backend: "local" (default) or optional S3-compatible object storage.
+# S3-compatible storage is disabled by default. To enable it, set storage_type = "s3",
+# configure the [s3] section below, and build the server with `--features s3`.
+storage_type = "local"
+path = "./data/uploads"
+# Maximum size (bytes) of a single upload/attachment. Enforced server-side on
+# every upload path; clients read this value to pre-validate and show the limit.
+# Default 52428800 (50 MB). Example: 104857600 = 100 MB.
+max_upload_size = 52428800
+# Maximum total stored bytes per guild (0 = unlimited). Default 10737418240 (10 GB).
+max_guild_storage_quota = 5368709120
+
+# [s3]
+# # Optional S3-compatible object storage (MinIO, Cloudflare R2, AWS S3,
+# # DigitalOcean Spaces, etc.).
+# # Only used when storage.storage_type = "s3".
+# bucket = "paracord-uploads"
+# region = "us-east-1"
+# # Custom endpoint for non-default providers:
+# # endpoint_url = "https://minio.example.com"
+# # force_path_style = true
+# # access_key_id = "your-access-key"
+# # secret_access_key = "your-secret-key"
+# # Disabled by default. Set true only when intentionally using AWS env/profile/
+# # SSO/instance-role credentials instead of explicit keys above.
+# # use_aws_credential_chain = false
+# # Optional key prefix for all objects:
+# # prefix = "paracord/"
+# # Optional CDN base URL (skips presigned URLs):
+# # cdn_url = "https://cdn.example.com"
+# # Presigned URL expiry (default 3600s):
+# # presign_expiry_seconds = 3600
+
+[media]
+storage_path = "./data/files"
+max_file_size = 1073741824
+p2p_threshold = 1073741824
+
+[voice]
+# Native QUIC/WebTransport voice stack. Enabled by default — this is the primary
+# media path and works out of the box with zero extra configuration. The [livekit]
+# section below is an optional fallback that operators can safely ignore. Set this
+# to false only to run a LiveKit-only deployment.
+# Env override: PARACORD_VOICE_NATIVE_MEDIA
+native_media = true
+# Unified UDP port for raw QUIC desktop clients and browser WebTransport.
+# Forward this port over UDP in addition to the HTTPS TCP port.
+# Env override: PARACORD_VOICE_PORT
+port = 8443
+# Env override: PARACORD_VOICE_MAX_PARTICIPANTS_PER_ROOM
+max_participants_per_room = 50
+# Env override: PARACORD_VOICE_AUDIO_BITRATE
+audio_bitrate = 96000
+# Env override: PARACORD_VOICE_E2EE_REQUIRED
+e2ee_required = true
+
+[livekit]
+# Optional fallback media server. Ignored while [voice] native_media = true.
+# These credentials are auto-generated so LiveKit works if you ever opt in.
+api_key = "paracord_ad7520f9"
+api_secret = "f0bc7ac474b94ac0cf9815c947643892"
+url = "ws://127.0.0.1:7880"
+http_url = "http://127.0.0.1:7880"
+# Optional public URL sent to clients:
+# public_url = "wss://your-domain-or-ip:8443/livekit"
+
+[federation]
+enabled = false
+# domain = "chat.example.com"
+# Hex-encoded ed25519 private key file used for federation request signing.
+signing_key_path = "./data/federation_signing_key.hex"
+allow_discovery = false
+# Per-peer rate limit for inbound federation events (per minute). Set to 0 to disable.
+# max_events_per_peer_per_minute = 120
+# Per-peer rate limit for remote user creation (per hour). Set to 0 to disable.
+# max_user_creates_per_peer_per_hour = 100
+
+[network]
+# On Windows, optionally auto-create local firewall allow rules.
+windows_firewall_auto_allow = false
+# Ask your router to let friends outside your home network reach this server, so
+# you never have to open its settings page yourself. Set to false if you would
+# rather set up port forwarding by hand (see docs/port-forwarding.md).
+# Env override: PARACORD_AUTO_PORT_FORWARD
+auto_port_forward = true
+# How long each router entry lasts, in seconds. It is refreshed automatically
+# while the server runs. Env override: PARACORD_PORT_FORWARD_LEASE_SECONDS
+port_forward_lease_seconds = 3600
+
+[tls]
+# HTTPS support — required for getUserMedia() on non-localhost origins.
+# A self-signed certificate is auto-generated on first run.
+enabled = true
+port = 8443
+cert_path = "./data/certs/cert.pem"
+key_path = "./data/certs/key.pem"
+auto_generate = true
+
+[tls.acme]
+# Optional ACME automation (certbot HTTP-01 webroot flow).
+enabled = false
+client_path = "certbot"
+directory_url = "https://acme-v02.api.letsencrypt.org/directory"
+# email = "ops@example.com"
+# domains = ["chat.example.com"]
+webroot_path = "./data/acme-webroot"
+cert_name = "paracord"
+# Optional source overrides if your ACME client writes certs elsewhere.
+# cert_source_path = "/etc/letsencrypt/live/paracord/fullchain.pem"
+# key_source_path = "/etc/letsencrypt/live/paracord/privkey.pem"
+serve_http_challenge = true
+auto_renew = true
+renew_interval_seconds = 43200
+# additional_args = ["--preferred-challenges", "http"]
+
+[retention]
+# Data retention purge worker. Disabled by default.
+enabled = true
+# How often to run retention jobs.
+interval_seconds = 3600
+# Maximum rows handled per category per tick.
+batch_size = 256
+# Set to integer day values to enable each retention policy.
+# message_days = 180
+# attachment_days = 30
+# audit_log_days = 365
+# security_event_days = 180
+# session_days = 90
+
+[at_rest]
+# Optional encryption-at-rest profile. Disabled by default.
+enabled = false
+# Name of environment variable that contains the 32-byte master key
+# (hex or base64 encoded).
+key_env = "PARACORD_AT_REST_KEY"
+# SQLCipher mode for SQLite (requires SQLCipher-enabled SQLite build).
+encrypt_sqlite = false
+# AES-256-GCM encryption for attachment payload bytes on disk.
+encrypt_files = false
+# During migration, allow reading older plaintext attachment files.
+allow_plaintext_file_reads = false
+
+[backup]
+# Backup configuration.
+backup_dir = "./data/backups"
+# Enable automatic periodic backups.
+auto_backup_enabled = true
+# Interval between automatic backups in seconds (default: 86400 = 24h).
+auto_backup_interval_seconds = 86400
+# Include media files (uploads, files) in backups.
+include_media = true
+# Maximum number of backups to keep (oldest are pruned).
+max_backups = 10
+
+[ai]
+# Optional AI provider configuration used by summarize/catch-up features.
+# Supported providers: "openai", "anthropic", "ollama", "openai_compatible"
+# provider = "openai"
+# base_url = "https://api.openai.com"
+# api_key = "replace-with-provider-key"
+# model = "gpt-4o-mini"
+timeout_seconds = 20

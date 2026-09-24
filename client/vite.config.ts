@@ -25,8 +25,8 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: "autoUpdate",
         manifest: {
-          name: "Paracord",
-          short_name: "Paracord",
+          name: "Archlast Mercury",
+          short_name: "Mercury",
           description: "A decentralized, self-hostable chat platform",
           theme_color: "#0a0c10",
           background_color: "#0a0c10",
@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          navigateFallbackDenylist: [/^\/api\//, /^\/_paracord\//, /^\/gateway/, /^\/livekit/, /^\/health/],
+          navigateFallbackDenylist: [/^\/api\//, /^\/_paracord\//, /^\/_mercury\//, /^\/gateway/, /^\/livekit/, /^\/health/],
           runtimeCaching: [],
           skipWaiting: true,
           clientsClaim: true,
@@ -82,6 +82,11 @@ export default defineConfig(({ mode }) => {
           secure: false,
         },
         "/_paracord": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/_mercury": {
           target: proxyTarget,
           changeOrigin: true,
           secure: false,

@@ -9,8 +9,8 @@ reasoning is in the checkpoints beside this file
 [WP9d-hard](wp9d-checkpoint.md)).
 
 Every gate case below lives in `client/e2e/motion-gate.spec.ts` and runs under
-`PARACORD_E2E_MOTION=1 npm run test:motion` (28 cases: 22 measured, 6 frame
-strips that are opt-in behind `PARACORD_E2E_MOTION_FRAMES=1`).
+`MERCURY_E2E_MOTION=1 npm run test:motion` (28 cases: 22 measured, 6 frame
+strips that are opt-in behind `MERCURY_E2E_MOTION_FRAMES=1`).
 
 ---
 
@@ -103,4 +103,4 @@ measurement that justifies it. There are no others.
 | **Frames not gated** (`{ frames: false }`) | `motion-shared (view transitions)` · `walk-in (view transitions)` · `lights-change (view transitions)` | The browser snapshots the whole viewport and composites off the main thread; this harness is a software-rendered headless Chromium with no GPU (wp9a-checkpoint §4). The choreography is still asserted, and the Web Animations path of each is frame-gated. |
 | **Exempt from the 500ms duration budget** | the speaking ring, the writing pulse, the on-air dot | Infinite breathes. §5.3 exempts breathing; the sampler skips infinite animations, and each one is asserted to *exist* and to be scoped correctly instead. `#motion-writing` is deliberately absent from the recipe-card sweep for this reason. |
 | **Animations under 1ms active duration ignored** | `reduced motion runs no animations at all` | Chromium leaves 0.01ms `scrollbar-color` transitions that a headless page never produces a frame to retire, so `document.getAnimations()` is never literally empty. The filter is "nothing that could move"; any real-duration animation still fails. |
-| **Frame strips are opt-in** | the six `capture …` cases | A CDP screencast is the only way to get real frames out of a 120–600ms moment. They skip unless `PARACORD_E2E_MOTION_FRAMES=1`, and all six share one `captureStrip` writer — zeroed on the act by default, or on the first frame the engine moved (`zeroOnEngine`) where the moment starts with a gateway round trip. |
+| **Frame strips are opt-in** | the six `capture …` cases | A CDP screencast is the only way to get real frames out of a 120–600ms moment. They skip unless `MERCURY_E2E_MOTION_FRAMES=1`, and all six share one `captureStrip` writer — zeroed on the act by default, or on the first frame the engine moved (`zeroOnEngine`) where the moment starts with a gateway round trip. |

@@ -28,7 +28,7 @@ In scope:
 1. **Native surface rendering** for all native-decoded video tracks (Linux full
    zero-copy; macOS via AVSampleBufferDisplayLayer; Windows intentionally excluded —
    see §2 route matrix).
-2. **GPU-resident decode outputs** in paracord-codec (CUDA / VAAPI-dmabuf / CVPixelBuffer
+2. **GPU-resident decode outputs** in mercury-codec (CUDA / VAAPI-dmabuf / CVPixelBuffer
    handles; CPU handle as the software floor).
 3. **Simulcast on by default** on hardware-encode paths, with relay-side per-viewer
    layer selection.
@@ -96,7 +96,7 @@ in Tauri state; per-track association lives in the existing dispatch state
 called by decode workers through an `Arc<Mutex<…>>` held per track (the per-frame lock
 is fine — present() only enqueues a handle and wakes the render side).
 
-### 3.2 DecodedFrameHandle (paracord-codec)
+### 3.2 DecodedFrameHandle (mercury-codec)
 
 ```rust
 pub enum DecodedFrameHandle {
@@ -213,7 +213,7 @@ raw IPC (that path no longer exists) and never silently blank.
 
 - Simulcast is ON by default **iff every layer's encoder is hardware** (lavc on Linux,
   MF on Windows, VT on macOS). The libvpx VP9 floor stays single-layer (CPU triple-
-  encode is a regression). `PARACORD_SCREEN_SIMULCAST` becomes an opt-OUT
+  encode is a regression). `MERCURY_SCREEN_SIMULCAST` becomes an opt-OUT
   (`=off`/`0`/`false` disables; unset = policy above).
 - Ladders (each layer's encoder constructed `new_with_input(capture_dims → layer_dims)`
   so scaling/conversion happens on the GPU per layer):
@@ -245,7 +245,7 @@ raw IPC (that path no longer exists) and never silently blank.
 
 ## 5. WebTransport bridge parity (browser viewers)
 
-- The bridge (`paracord-transport/src/webtransport.rs` + relay forwarding) forwards
+- The bridge (`mercury-transport/src/webtransport.rs` + relay forwarding) forwards
   uni-stream frames **byte-for-byte in both directions**: relay→viewer keyframe uni
   streams become WT uni streams to the browser; browser publishers send keyframes on WT
   uni streams that the bridge relays as QUIC uni streams (identical framing, contract
@@ -260,8 +260,8 @@ raw IPC (that path no longer exists) and never silently blank.
 ## 6. NVENC colorspace verification (hardware-verifiable HERE)
 
 Procedure (agent runs on this machine — RTX 4080, ffmpeg CLI present):
-1. Add `crates/paracord-codec/examples/nvenc_colorspace_probe.rs` (or an ignored test
-   gated on `PARACORD_HW_TESTS=1`): build the real `LavcEncoder` NVENC pipeline with
+1. Add `crates/mercury-codec/examples/nvenc_colorspace_probe.rs` (or an ignored test
+   gated on `MERCURY_HW_TESTS=1`): build the real `LavcEncoder` NVENC pipeline with
    BGRA input; feed full-frame patches of known sRGB colors (735,735 gray, pure R/G/B,
    white, black); encode ~30 frames.
 2. Decode the bitstream (ffmpeg CLI to rawvideo yuv420p) and measure patch Y/Cb/Cr
@@ -286,7 +286,7 @@ Procedure (agent runs on this machine — RTX 4080, ffmpeg CLI present):
 | Work | Compile-verify here | Test-verify here | Review-only |
 |---|---|---|---|
 | Linux surface + CUDA/VAAPI interop | ✅ | partial (GL/CUDA need a session; unit-test geometry math, handle lifetimes, fd ownership) | — |
-| paracord-codec GPU handles | ✅ | ✅ (CPU paths; hw behind env gate) | — |
+| mercury-codec GPU handles | ✅ | ✅ (CPU paths; hw behind env gate) | — |
 | Simulcast encoders + relay selection | ✅ | ✅ (relay selection unit tests) | — |
 | WT bridge + browserMediaEngine | ✅ / tsc | ✅ (bridge piping tests) | — |
 | NVENC colorspace probe | ✅ | ✅ **runs on the 4080** | — |

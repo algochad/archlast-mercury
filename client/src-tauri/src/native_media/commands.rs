@@ -3,8 +3,8 @@ use std::sync::atomic::Ordering;
 use tauri::State;
 
 use super::MediaState;
-use paracord_transport::control::ControlMessage;
-use paracord_transport::stream::{PublishedTrack, StreamId, TrackId, TrackSubscription};
+use mercury_transport::control::ControlMessage;
+use mercury_transport::stream::{PublishedTrack, StreamId, TrackId, TrackSubscription};
 
 #[derive(Serialize)]
 pub struct VoiceSessionInfo {
@@ -27,7 +27,7 @@ pub struct TrackSubscriptionDiagnostics {
     pub track_id: String,
     pub requested_layer: Option<u8>,
     pub active_layer: Option<u8>,
-    pub viewport: Option<paracord_transport::stream::ViewportHint>,
+    pub viewport: Option<mercury_transport::stream::ViewportHint>,
 }
 
 #[derive(Debug, Serialize)]
@@ -64,7 +64,7 @@ pub struct ActiveVideoBackend {
 pub struct SessionParticipantCapabilities {
     pub user_id: String,
     pub session_id: String,
-    pub video_capabilities: Vec<paracord_transport::stream::VideoCodecCapability>,
+    pub video_capabilities: Vec<mercury_transport::stream::VideoCodecCapability>,
     /// The call key this peer published, carried straight through to the
     /// renderer, which owns the wrapping.
     pub media_public_key: Option<String>,
@@ -146,7 +146,7 @@ pub async fn start_voice_session(
     // key to encrypt to is refused here rather than started and then found to
     // be silent.
     let media_public_key = match media_public_key {
-        Some(key) if paracord_transport::control::is_valid_media_public_key(&key) => key,
+        Some(key) if mercury_transport::control::is_valid_media_public_key(&key) => key,
         _ => return Err("a native call needs a media call key".into()),
     };
     state.calls.begin(&owner_id)?;
@@ -289,8 +289,8 @@ pub struct AudioDeviceList {
     pub warning: Option<String>,
 }
 
-fn to_device_list(list: paracord_codec::audio::devices::DeviceList) -> AudioDeviceList {
-    use paracord_codec::audio::devices::DeviceGroup;
+fn to_device_list(list: mercury_codec::audio::devices::DeviceList) -> AudioDeviceList {
+    use mercury_codec::audio::devices::DeviceGroup;
     AudioDeviceList {
         devices: list
             .devices
@@ -315,7 +315,7 @@ fn to_device_list(list: paracord_codec::audio::devices::DeviceList) -> AudioDevi
 
 #[tauri::command]
 pub async fn voice_list_output_devices() -> Result<AudioDeviceList, String> {
-    use paracord_codec::audio::playback::list_output_devices;
+    use mercury_codec::audio::playback::list_output_devices;
 
     let list = list_output_devices().map_err(|e| format!("list output devices: {e}"))?;
     Ok(to_device_list(list))
@@ -323,7 +323,7 @@ pub async fn voice_list_output_devices() -> Result<AudioDeviceList, String> {
 
 #[tauri::command]
 pub async fn voice_list_input_devices() -> Result<AudioDeviceList, String> {
-    use paracord_codec::audio::capture::list_input_devices;
+    use mercury_codec::audio::capture::list_input_devices;
 
     let list = list_input_devices().map_err(|e| format!("list input devices: {e}"))?;
     Ok(to_device_list(list))
@@ -759,7 +759,7 @@ pub async fn voice_set_screen_audio_enabled(
                 }
                 let _ = session
                     .send_control_message(
-                        &paracord_transport::control::ControlMessage::TrackUnpublish {
+                        &mercury_transport::control::ControlMessage::TrackUnpublish {
                             stream_id: track.stream_id.clone(),
                             track_id: track.track_id.clone(),
                         },
@@ -1232,7 +1232,7 @@ pub async fn media_register_track_subscription(
     let track_id = TrackId::new(request.track_id);
     let viewport = match (request.viewport_width, request.viewport_height) {
         (Some(width), Some(height)) => {
-            Some(paracord_transport::stream::ViewportHint { width, height })
+            Some(mercury_transport::stream::ViewportHint { width, height })
         }
         _ => None,
     };
@@ -1335,7 +1335,7 @@ pub async fn media_subscribe_audio(
     session
         .send_control_message(&ControlMessage::Subscribe {
             user_id,
-            track_type: paracord_transport::control::TrackKind::Audio,
+            track_type: mercury_transport::control::TrackKind::Audio,
         })
         .await
 }
@@ -1357,7 +1357,7 @@ pub async fn media_unsubscribe_audio(
     session
         .send_control_message(&ControlMessage::Unsubscribe {
             user_id,
-            track_type: paracord_transport::control::TrackKind::Audio,
+            track_type: mercury_transport::control::TrackKind::Audio,
         })
         .await
 }
@@ -1373,7 +1373,7 @@ pub async fn media_apply_audio_sender_key(
     let _transition = state.calls.transition.lock().await;
     state.calls.check(&owner_id)?;
 
-    use paracord_codec::crypto::KEY_SIZE;
+    use mercury_codec::crypto::KEY_SIZE;
 
     let key: [u8; KEY_SIZE] = raw_key
         .try_into()
@@ -1406,7 +1406,7 @@ pub async fn media_apply_track_sender_key(
     let _transition = state.calls.transition.lock().await;
     state.calls.check(&owner_id)?;
 
-    use paracord_codec::crypto::KEY_SIZE;
+    use mercury_codec::crypto::KEY_SIZE;
 
     let key: [u8; KEY_SIZE] = raw_key
         .try_into()

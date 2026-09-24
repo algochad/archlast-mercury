@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release-binary scheduled events lifecycle smoke test.
 
-Starts `target/release/paracord-server` with a temporary SQLite database and
+Starts `target/release/mercury-server` with a temporary SQLite database and
 validates scheduled-event permissions, validation, worker lifecycle, event
 channel cleanup, recurrence creation, RSVP, iCal export, and deletion.
 """
@@ -521,7 +521,7 @@ def run_smoke(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--server", help="Path to release paracord-server binary")
+    parser.add_argument("--server", help="Path to release mercury-server binary")
     parser.add_argument("--port", type=int, default=18137)
     args = parser.parse_args()
     run_smoke(args)

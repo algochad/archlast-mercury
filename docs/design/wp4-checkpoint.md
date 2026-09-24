@@ -148,7 +148,7 @@ worse than none.
 There was **no** client API module, store or hook for guild scheduled events —
 everything lived inline in `components/guild/EventList.tsx`. WP4 did not build
 one; `useNextEvent.ts` calls the same endpoints through `getApi()` and keeps its
-own state, and it listens to the same `paracord:scheduled-events-changed` DOM
+own state, and it listens to the same `mercury:scheduled-events-changed` DOM
 event the gateway already dispatches, so an event created elsewhere refreshes
 the Lobby. A calendar that cannot be read produces **no card and no toast** —
 there is nothing a reader can do about it from the street. A failed RSVP does
@@ -192,7 +192,7 @@ Run from `client/`.
 | `npm run build` | pass |
 | `npm run test:contrast` | 49 checks × 4 themes passed |
 | `npm run test:a11y:static` | no WP4 finding (the audit's one icon-only-button complaint about `AddRoomTile` was fixed by naming it explicitly; the two that remain are WP5's and WP6's files) |
-| `PARACORD_E2E_DESIGN=1 PARACORD_E2E_DESIGN_WP=wp4 npx playwright test e2e/design-review.spec.ts` | pass — four frames |
+| `MERCURY_E2E_DESIGN=1 MERCURY_E2E_DESIGN_WP=wp4 npx playwright test e2e/design-review.spec.ts` | pass — four frames |
 
 The mocked smoke (`npx playwright test`) reports **82 passed, 2 failed** — both
 failures are the same assertion in `smoke.spec.ts`, waiting on the composer
@@ -227,7 +227,7 @@ design-review captures, which boot the same mocked shell.
 ### Screenshots
 
 ```bash
-PARACORD_E2E_DESIGN=1 PARACORD_E2E_DESIGN_WP=wp4 npx playwright test e2e/design-review.spec.ts
+MERCURY_E2E_DESIGN=1 MERCURY_E2E_DESIGN_WP=wp4 npx playwright test e2e/design-review.spec.ts
 # → output/design-reference/wp4/ (gitignored)
 ```
 

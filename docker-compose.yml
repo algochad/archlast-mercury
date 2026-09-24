@@ -1,17 +1,17 @@
 services:
-  paracord:
+  mercury:
     # Default behaviour in a source checkout is unchanged: `build` policy +
     # local context means `docker compose up -d` builds from this tree.
     #
     # Two env overrides make the same file work with NO checkout:
     #   PARACORD_PULL_POLICY=missing   # pull ghcr.io image instead of building
-    #   PARACORD_BUILD_CONTEXT=https://github.com/Scdouglas1999/Paracord.git#main
+    #   PARACORD_BUILD_CONTEXT=https://github.com/algochad/archlast-mercury.git#main
     #                                  # build straight from the remote repo
     # Example no-clone run:
     #   curl -fsSL -o docker-compose.yml \
-    #     https://raw.githubusercontent.com/Scdouglas1999/Paracord/main/docker-compose.yml
+    #     https://raw.githubusercontent.com/algochad/archlast-mercury/main/docker-compose.yml
     #   PARACORD_PULL_POLICY=missing docker compose up -d
-    image: ghcr.io/scdouglas1999/paracord:latest
+    image: ghcr.io/algochad/archlast-mercury:latest
     pull_policy: ${PARACORD_PULL_POLICY:-build}
     build: ${PARACORD_BUILD_CONTEXT:-.}
     container_name: paracord
@@ -37,27 +37,26 @@ services:
       - PARACORD_SERVER_NAME=localhost
       # - PARACORD_PUBLIC_URL=https://chat.example.com
 
-      # Database — SQLite by default (zero config). When running with
-      # --profile postgres, set in .env:
-      #   POSTGRES_PASSWORD=<strong random: openssl rand -hex 32>
-      #   PARACORD_DATABASE_URL=postgresql://paracord:${POSTGRES_PASSWORD}@postgres:5432/paracord
-      #   PARACORD_DATABASE_ENGINE=postgres
-      # On Coolify with a managed Postgres resource, set PARACORD_DATABASE_URL
+      # Database — PostgreSQL by default. Requires POSTGRES_PASSWORD in .env
+      # (generate: openssl rand -hex 32). SQLite remains available as fallback:
+      # set MERCURY_DATABASE_ENGINE=sqlite + MERCURY_DATABASE_URL=sqlite:///data/mercury.db?mode=rwc.
+      # (PARACORD_* aliases still work via server fallback.)
+      # On Coolify with a managed Postgres resource, set MERCURY_DATABASE_URL
       # to that resource's internal URL instead (see docs/coolify.md).
-      # The defaults below keep `docker compose up -d` on SQLite.
-      - PARACORD_DATABASE_URL=${PARACORD_DATABASE_URL:-sqlite:///data/paracord.db?mode=rwc}
-      - PARACORD_DATABASE_ENGINE=${PARACORD_DATABASE_ENGINE:-sqlite}
-      - PARACORD_DATABASE_MAX_CONNECTIONS=${PARACORD_DATABASE_MAX_CONNECTIONS:-20}
+      - MERCURY_DATABASE_URL=${MERCURY_DATABASE_URL:-postgresql://mercury:${POSTGRES_PASSWORD:-changeme}@postgres:5432/mercury}
+      - MERCURY_DATABASE_ENGINE=${MERCURY_DATABASE_ENGINE:-postgres}
+      - MERCURY_DATABASE_MAX_CONNECTIONS=${MERCURY_DATABASE_MAX_CONNECTIONS:-50}
 
       # Auth: no secret needed here. The server generates a strong random
-      # jwt_secret on first run and persists it to /data/paracord.toml, then
+      # jwt_secret on first run and persists it to /data/mercury.toml, then
       # reuses it on every restart. Nothing to set, nothing to leak in env.
+      # (Falls back to /data/paracord.toml for backward compatibility.)
       - PARACORD_REGISTRATION_ENABLED=true
 
       # First-owner claim: until this server is claimed nobody can register,
       # which is what stops whoever finds the address first from owning it.
       # The one-time claim token is printed on startup (`docker compose logs
-      # paracord`) and saved as /data/first-owner-claim.txt. Open
+      # mercury`) and saved as /data/first-owner-claim.txt. Open
       # http://localhost:8090/setup-server and paste it.
       #
       # To pin the token in advance (provisioning, CI), uncomment and set at
@@ -101,10 +100,9 @@ services:
       # the native desktop client speaks raw QUIC and does not.
       - PARACORD_TLS_ENABLED=false
     restart: unless-stopped
-
   # Optional LiveKit fallback. NOT started by default — bring it up explicitly
   # with `docker compose --profile livekit up -d` (and set
-  # PARACORD_VOICE_NATIVE_MEDIA=false on the paracord service to route through it).
+  # PARACORD_VOICE_NATIVE_MEDIA=false on the mercury service to route through it).
   livekit:
     image: livekit/livekit-server:v1.9.11
     container_name: paracord-livekit
@@ -131,18 +129,16 @@ services:
     command: --bind 0.0.0.0
     restart: unless-stopped
 
-  # Optional PostgreSQL — NOT started by default. Bring it up explicitly:
-  #   Local: docker compose --profile postgres up -d   (needs POSTGRES_PASSWORD in .env)
-  #   Coolify: create a managed Postgres resource instead and point
-  #            PARACORD_DATABASE_URL at it (see docs/coolify.md); this
-  #            compose service is for local dev / non-Coolify hosts.
+  # PostgreSQL — primary database. Starts by default with `docker compose up -d`.
+  # Requires POSTGRES_PASSWORD in .env (generate: openssl rand -hex 32).
+  # Coolify: use a managed Postgres resource instead and point MERCURY_DATABASE_URL
+  # at it (see docs/coolify.md); then remove this service or leave it stopped.
   postgres:
     image: postgres:16-alpine
-    container_name: paracord-postgres
-    profiles: ["postgres"]
+    container_name: mercury-postgres
     environment:
-      POSTGRES_DB: paracord
-      POSTGRES_USER: paracord
+      POSTGRES_DB: mercury
+      POSTGRES_USER: mercury
       # Compose interpolates inactive-profile services too, so a `:?` guard here
       # would break SQLite zero-config (`docker compose config` with no .env).
       # Empty default instead: the postgres image itself refuses an empty
@@ -151,12 +147,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    # No host port mapping by default — internal only (paracord → postgres:5432).
+    # No host port mapping by default — internal only (mercury → postgres:5432).
     # To `psql` from the host, add temporarily:
     #   ports: ["127.0.0.1:5432:5432"]
-    # or use: docker compose --profile postgres exec postgres psql -U paracord
+    # or use: docker compose exec postgres psql -U mercury
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U paracord -d paracord"]
+      test: ["CMD-SHELL", "pg_isready -U mercury -d mercury"]
       interval: 5s
       timeout: 3s
       retries: 10

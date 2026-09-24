@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release-binary native-default voice smoke test.
 
-Boots a zero-config `paracord-server` (no hand-written config, no LiveKit) and
+Boots a zero-config `mercury-server` (no hand-written config, no LiveKit) and
 proves that joining a voice channel returns a *native* QUIC media session:
 `native_media: true`, real endpoint candidates, a media token, a cert hash, and
 `livekit_available: false` — with no `livekit-server` string anywhere in the

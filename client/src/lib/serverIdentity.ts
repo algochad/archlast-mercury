@@ -55,7 +55,7 @@ export function resolveHomeServerUrl(): string {
  *
  * `__local__` is the home *session* — the account behind the process-global
  * access token — not a server of its own. In a browser served by its own
- * Paracord instance those are separate things. On the desktop they are not: the
+ * Archlast Mercury instance those are separate things. On the desktop they are not: the
  * shell has no origin server, so it always adds its own server by address, and
  * that entry IS the home server. Holding both identities open made one account
  * look like two, and every building, member, DM and unread badge was counted

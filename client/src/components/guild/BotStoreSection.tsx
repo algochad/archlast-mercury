@@ -412,7 +412,7 @@ export function BotStoreSection({
     <div className="flex flex-col gap-8">
       <SectionHeader
         title="Bot store"
-        description="Install the bots that ship with Paracord, tune their moderation rules, or browse what other developers have published."
+        description="Install the bots that ship with Archlast Mercury, tune their moderation rules, or browse what other developers have published."
       />
 
       <Tabs
@@ -661,7 +661,7 @@ export function BotStoreSection({
       )}
 
       <section className="flex flex-col gap-3">
-        <GroupLabel>Bots that ship with Paracord</GroupLabel>
+        <GroupLabel>Bots that ship with Archlast Mercury</GroupLabel>
         <Well bare className="divide-y divide-border-subtle px-4">
           {filteredBots.map((bot) => {
             const installed = botSettings[bot.id]?.enabled === true;
@@ -722,7 +722,7 @@ export function BotStoreSection({
       <section className="flex flex-col gap-3" aria-labelledby="included-tools-heading">
         <div>
           <h3 id="included-tools-heading" className="pc-display text-heading text-text-primary">Already included with every server</h3>
-          <p className="mt-1 text-body leading-relaxed text-text-secondary">These are native Paracord tools, so there is no bot to install.</p>
+          <p className="mt-1 text-body leading-relaxed text-text-secondary">These are native Archlast Mercury tools, so there is no bot to install.</p>
         </div>
         <Well bare className="divide-y divide-border-subtle px-4">
           {INCLUDED_TOOLS.map((tool) => {

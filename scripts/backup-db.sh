@@ -4,7 +4,7 @@
 # This is the small, scriptable half of backup. It does not capture uploads,
 # media, TLS material or the federation signing key — for a complete archive
 # use the Backups panel in the admin area (or the server's scheduled backups),
-# and recover it with `paracord-server restore-backup` / scripts/restore-db.sh.
+# and recover it with `mercury-server restore-backup` / scripts/restore-db.sh.
 #
 # Usage:  scripts/backup-db.sh [output-dir]
 # Reads the database URL from PARACORD_DATABASE_URL and picks the right tool
@@ -19,7 +19,7 @@ mkdir -p "$OUTPUT_DIR"
 DB_URL="${PARACORD_DATABASE_URL:-}"
 if [ -z "$DB_URL" ]; then
   echo "PARACORD_DATABASE_URL is not set." >&2
-  echo "Set it to the url from [database] in your paracord.toml, for example:" >&2
+  echo "Set it to the url from [database] in your mercury.toml, for example:" >&2
   echo "  PARACORD_DATABASE_URL='sqlite:///var/lib/paracord/paracord.db' $0 $OUTPUT_DIR" >&2
   exit 2
 fi

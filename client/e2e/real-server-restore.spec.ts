@@ -181,6 +181,7 @@ async function runRestore(
 // d.user.id and d.database_history_epoch; nothing else is inspected.
 const WIRE_INIT = `(() => {
   const wire = { readies: [] };
+  Object.defineProperty(window, '__mercuryWire', { value: wire });
   Object.defineProperty(window, '__paracordWire', { value: wire });
   const NativeEventSource = window.EventSource;
   window.EventSource = class extends NativeEventSource {
@@ -207,13 +208,13 @@ const WIRE_INIT = `(() => {
 type WireReady = { user: string; epoch: string; session: string | null };
 const wireOf = (page: Page) =>
   page.evaluate(
-    () => (window as unknown as { __paracordWire: { readies: WireReady[] } }).__paracordWire,
+    () => (window as unknown as { __mercuryWire: { readies: WireReady[] }; __paracordWire: { readies: WireReady[] } }).__mercuryWire ?? (window as unknown as { __paracordWire: { readies: WireReady[] } }).__paracordWire,
   );
 
 async function waitForReadyWithEpoch(page: Page, userId: string, epoch: string, timeoutMs = 20_000) {
   await page.waitForFunction(
     ([id, want]) =>
-      (window as unknown as { __paracordWire: { readies: WireReady[] } }).__paracordWire.readies.some(
+      ((window as unknown as { __mercuryWire: { readies: WireReady[] } }).__mercuryWire ?? (window as unknown as { __paracordWire: { readies: WireReady[] } }).__paracordWire).readies.some(
         (ready) => ready.user === id && ready.epoch === want,
       ),
     [userId, epoch],
@@ -224,7 +225,7 @@ async function waitForReadyWithEpoch(page: Page, userId: string, epoch: string, 
 async function waitForReadyExcludingEpoch(page: Page, userId: string, epoch: string, timeoutMs = 30_000) {
   await page.waitForFunction(
     ([id, stale]) =>
-      (window as unknown as { __paracordWire: { readies: WireReady[] } }).__paracordWire.readies.some(
+      ((window as unknown as { __mercuryWire: { readies: WireReady[] } }).__mercuryWire ?? (window as unknown as { __paracordWire: { readies: WireReady[] } }).__paracordWire).readies.some(
         (ready) => ready.user === id && ready.epoch !== '' && ready.epoch !== stale,
       ),
     [userId, epoch],

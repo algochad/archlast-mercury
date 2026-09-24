@@ -69,7 +69,7 @@ function useServerStatus() {
 
     // Under Tauri the app is served from a local bundle (tauri://localhost), so
     // a same-origin `/health` probe would target the desktop shell rather than a
-    // Paracord server. Resolve the API base first; when it is only the relative
+    // Archlast Mercury server. Resolve the API base first; when it is only the relative
     // fallback there is no server origin to probe, so require an explicit connect.
     const base = resolveApiBaseUrl();
     if (isTauri() && !base.startsWith('http')) {
@@ -275,7 +275,7 @@ function BrandedSplash({ label }: { label: string }) {
         <AppMark size={52} />
       </div>
       <div className="flex flex-col items-center gap-1.5">
-        <span className="font-display text-heading text-text-primary">Paracord</span>
+        <span className="font-display text-heading text-text-primary">Archlast Mercury</span>
         <p className="text-meta text-text-muted" role="status" aria-live="polite">
           {label}
         </p>
@@ -445,7 +445,7 @@ function GuardStalled({ to }: { to: CryptoAuthRedirect | '/app' }) {
       <div className="flex w-full max-w-md flex-col items-start gap-4">
         <AppMark size={40} />
         <div className="flex flex-col gap-1.5">
-          <h1 className="font-display text-heading text-text-primary">Paracord could not open {destination}</h1>
+          <h1 className="font-display text-heading text-text-primary">Archlast Mercury could not open {destination}</h1>
           <p className="text-label leading-relaxed text-text-secondary">
             Your sign-in worked, but this device could not move on to the next screen.
             Try again, or sign out and start over.

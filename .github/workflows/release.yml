@@ -117,7 +117,7 @@ jobs:
         run: npm run build
 
       - name: Build server binary
-        run: cargo build --release --bin paracord-server
+        run: cargo build --release --bin mercury-server
 
       - name: Download LiveKit (Windows)
         shell: pwsh
@@ -135,29 +135,33 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
-          $pkgDir = "dist/paracord-server"
+          $pkgDir = "dist/mercury-server"
           New-Item -ItemType Directory -Path $pkgDir -Force | Out-Null
 
-          Copy-Item target/release/paracord-server.exe "$pkgDir/paracord-server.exe" -Force
+          Copy-Item target/release/mercury-server.exe "$pkgDir/mercury-server.exe" -Force
+          # Compat alias: keep paracord-server.exe for one version
+          Copy-Item target/release/mercury-server.exe "$pkgDir/paracord-server.exe" -Force
           Copy-Item target/release/livekit-server.exe "$pkgDir/livekit-server.exe" -Force
-          Copy-Item config/paracord.example.toml "$pkgDir/paracord.example.toml" -Force
+          Copy-Item config/mercury.toml "$pkgDir/mercury.toml" -Force
+          # Compat: also include old example name if present
+          if (Test-Path config/paracord.example.toml) { Copy-Item config/paracord.example.toml "$pkgDir/paracord.example.toml" -Force }
 
           @"
-          Paracord Server v${version}
-          ========================
+          Archlast Mercury Server v${version}
+          ===============================
 
           Included binaries:
-            - paracord-server.exe
+            - mercury-server.exe (compat alias: paracord-server.exe)
             - livekit-server.exe
           "@ | Out-File -FilePath "$pkgDir/README.txt" -Encoding UTF8
 
-          Compress-Archive -Path "$pkgDir/*" -DestinationPath "dist/paracord-server-windows-x64-${version}.zip" -Force
+          Compress-Archive -Path "$pkgDir/*" -DestinationPath "dist/mercury-server-windows-x64-${version}.zip" -Force
 
       - name: Upload server artifact (Windows)
         uses: actions/upload-artifact@v4
         with:
           name: server-windows
-          path: dist/paracord-server-windows-x64-*.zip
+          path: dist/mercury-server-windows-x64-*.zip
           if-no-files-found: error
 
   build-server-linux:
@@ -186,7 +190,7 @@ jobs:
         run: npm run build
 
       - name: Build server binary
-        run: cargo build --release --bin paracord-server
+        run: cargo build --release --bin mercury-server
 
       - name: Download LiveKit (Linux)
         shell: bash
@@ -211,23 +215,26 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          pkg_dir="dist/paracord-server"
+          pkg_dir="dist/mercury-server"
           mkdir -p "$pkg_dir"
 
-          cp target/release/paracord-server "$pkg_dir/paracord-server"
+          cp target/release/mercury-server "$pkg_dir/mercury-server"
+          # Compat alias for one version
+          cp target/release/mercury-server "$pkg_dir/paracord-server"
           cp target/release/livekit-server "$pkg_dir/livekit-server"
-          cp config/paracord.example.toml "$pkg_dir/paracord.example.toml"
+          cp config/mercury.toml "$pkg_dir/mercury.toml"
+          if [ -f config/paracord.example.toml ]; then cp config/paracord.example.toml "$pkg_dir/paracord.example.toml"; fi
 
           cat > "$pkg_dir/README.txt" <<EOF
-          Paracord Server v${version}
-          ========================
+          Archlast Mercury Server v${version}
+          ===============================
 
           Included binaries:
-            - paracord-server
+            - mercury-server (compat alias: paracord-server)
             - livekit-server
           EOF
 
-          tar -czf "dist/paracord-server-linux-x64-${version}.tar.gz" -C dist paracord-server
+          tar -czf "dist/mercury-server-linux-x64-${version}.tar.gz" -C dist mercury-server
 
       - name: Verify LiveKit included in Linux tarball
         shell: bash
@@ -241,15 +248,14 @@ jobs:
           # file was found. Whether it trips depends on how much tar still had
           # to write when grep left, so it passed while the artifacts were small
           # and started failing as they grew.
-          listing="$(tar -tzf "dist/paracord-server-linux-x64-${version}.tar.gz")"
+          listing="$(tar -tzf "dist/mercury-server-linux-x64-${version}.tar.gz")"
           printf '%s\n' "$listing" | grep -q "livekit-server"
 
       - name: Upload server artifact (Linux)
         uses: actions/upload-artifact@v4
         with:
           name: server-linux
-          path: dist/paracord-server-linux-x64-*.tar.gz
-          if-no-files-found: error
+          path: dist/mercury-server-linux-x64-*.tar.gz
 
   build-server-macos:
     name: Build Server (macOS ${{ matrix.arch }})
@@ -296,11 +302,11 @@ jobs:
         run: npm run build
 
       - name: Build server binary
-        run: cargo build --release --target ${{ matrix.target }} --bin paracord-server
+        run: cargo build --release --target ${{ matrix.target }} --bin mercury-server
 
       # No LiveKit here, on purpose: LiveKit publishes no macOS binary (the step
       # that fetched one could only ever 404), and voice and video run on
-      # Paracord's own media engine. The installer already treats the companion
+      # Archlast Mercury's own media engine. The installer already treats the companion
       # as optional.
       - name: Package server artifact (macOS)
         shell: bash
@@ -308,17 +314,18 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           mkdir -p dist
-          cp "target/${{ matrix.target }}/release/paracord-server" dist/
-          chmod +x dist/paracord-server
-          tar -czf "dist/paracord-server-macos-${{ matrix.arch }}-${version}.tar.gz" \
-            -C dist paracord-server
+          cp "target/${{ matrix.target }}/release/mercury-server" dist/mercury-server
+          chmod +x dist/mercury-server
+          # Compat alias
+          cp dist/mercury-server dist/paracord-server
+          tar -czf "dist/mercury-server-macos-${{ matrix.arch }}-${version}.tar.gz" \
+            -C dist mercury-server paracord-server
 
       - name: Upload server artifact (macOS)
         uses: actions/upload-artifact@v4
         with:
           name: server-macos-${{ matrix.arch }}
-          path: dist/paracord-server-macos-*.tar.gz
-          if-no-files-found: error
+          path: dist/mercury-server-macos-*.tar.gz
 
   build-client-macos:
     name: Build Client (macOS ${{ matrix.arch }})
@@ -768,11 +775,10 @@ jobs:
           ---
 
           ## Downloads
-
           | Component | File |
           |-----------|------|
-          | Server (Windows x64) | `paracord-server-windows-x64-*.zip` |
-          | Server (Linux x64) | `paracord-server-linux-x64-*.tar.gz` |
+          | Server (Windows x64) | `mercury-server-windows-x64-*.zip` (compat alias: `paracord-server-*` inside) |
+          | Server (Linux x64) | `mercury-server-linux-x64-*.tar.gz` (compat alias: `paracord-server` inside) |
           | Client Installer (Windows) | `Paracord-Setup-*.exe` |
           | Client MSI (Windows) | `Paracord_*_x64_en-US.msi` |
           | Client AppImage (Linux) | `Paracord_*.AppImage` |
@@ -780,9 +786,8 @@ jobs:
           | Client rpm (Fedora/RHEL) | `paracord-*.x86_64.rpm` |
           | Client (macOS, Apple Silicon) | `Paracord_*_aarch64.dmg` |
           | Client (macOS, Intel) | `Paracord_*_x64.dmg` |
-          | Server (macOS) | `paracord-server-macos-*.tar.gz` |
+          | Server (macOS) | `mercury-server-macos-*.tar.gz` (compat alias: `paracord-server` inside) |
           | Signed updater manifest, when signing artifacts are configured | `latest.json` |
-          DOWNLOADS
 
       - name: Verify required release artifacts
         shell: bash

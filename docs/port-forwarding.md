@@ -1,11 +1,11 @@
 # Letting friends outside your network join
 
-Your Paracord server runs on your computer. People on the same Wi-Fi can reach it
+Your Archlast Mercury server runs on your computer. People on the same Wi-Fi can reach it
 straight away. People anywhere else cannot — not because anything is broken, but
 because your router does not yet know that traffic arriving from the internet
 should be handed to your computer.
 
-Paracord tries to arrange that for you when it starts. If it managed it, the
+Archlast Mercury tries to arrange that for you when it starts. If it managed it, the
 startup message says **"Friends anywhere can join at ..."** and you are done —
 there is nothing on this page you need to do.
 
@@ -16,7 +16,7 @@ takes about five minutes and you only do it once.
 
 ## What you need before you start
 
-Paracord printed all three of these when it started:
+Archlast Mercury printed all three of these when it started:
 
 1. **The port number.** Under the normal settings this is **8443**, and you open
    it for both **TCP** and **UDP**. (TCP carries the app; UDP carries voice,
@@ -78,14 +78,14 @@ Add a rule (some routers make you add two: one per protocol) with these values:
 
 | Field on your router | What to enter |
 | --- | --- |
-| Name / Description / Service | `Paracord` |
+| Name / Description / Service | `Archlast Mercury` |
 | Protocol | `TCP/UDP` — or, if you must pick one, make **two** rules: one TCP, one UDP |
 | External / Public / WAN port | `8443` |
 | Internal / Private / LAN port | `8443` — the same number |
 | Internal IP / Device / To address | this computer's local address, e.g. `192.168.1.5` |
 | Enabled | yes |
 
-Keep the external and internal port numbers the same. Paracord tells people one
+Keep the external and internal port numbers the same. Archlast Mercury tells people one
 address, and clients work out where to send voice and video from that same
 number; a different outside port breaks calls.
 
@@ -95,12 +95,12 @@ Save, and apply or reboot if the router asks you to.
 
 The router is only the first door. Your computer has one too.
 
-- **Windows:** Paracord adds its own allow rules when
+- **Windows:** Archlast Mercury adds its own allow rules when
   `[network] windows_firewall_auto_allow = true`. Otherwise: Windows Defender
   Firewall → Advanced settings → Inbound Rules → New Rule → Port → TCP `8443`,
   then repeat for UDP.
 - **macOS:** System Settings → Network → Firewall → Options → allow incoming
-  connections for `paracord-server`.
+  connections for `mercury-server`.
 - **Linux:** with `ufw`, `sudo ufw allow 8443/tcp && sudo ufw allow 8443/udp`;
   with `firewalld`,
   `sudo firewall-cmd --permanent --add-port=8443/tcp --add-port=8443/udp && sudo firewall-cmd --reload`.
@@ -112,7 +112,7 @@ The router is only the first door. Your computer has one too.
 **The server has to be running** for any of these checks to pass.
 
 1. **Find your public address.** Open <https://ifconfig.me> on this computer, or
-   read it from Paracord's startup message. It looks like `203.0.113.9`.
+   read it from Archlast Mercury's startup message. It looks like `203.0.113.9`.
 2. **Test the TCP port from outside your network.** Open
    <https://www.yougetsignal.com/tools/open-ports/> or
    <https://portchecker.co/> and check port `8443`. It should say **open**.
@@ -120,7 +120,7 @@ The router is only the first door. Your computer has one too.
    anything: many routers answer local requests without ever using the rule.
 3. **Open the real thing from somewhere else.** On a phone with Wi-Fi turned
    **off**, visit `https://<your public address>:8443` — for example
-   `https://203.0.113.9:8443`. You should see Paracord's sign-in page.
+   `https://203.0.113.9:8443`. You should see Archlast Mercury's sign-in page.
 4. **Make a call.** Voice and video use UDP, and UDP is the part people forget.
    Join a voice channel from that phone and say something. If the page loads but
    calls are silent, the UDP half of the rule is missing or wrong.
@@ -139,10 +139,10 @@ The router is only the first door. Your computer has one too.
   of port forwarding helps, because the address is not yours. Tell-tale sign: the
   WAN address on your router starts with `100.64.`–`100.127.`, or simply does not
   match <https://ifconfig.me>. Ask your provider for a public IP address (some
-  give one free, some charge a little), or run Paracord on a rented server
+  give one free, some charge a little), or run Archlast Mercury on a rented server
   instead.
 - **The port is already taken.** If another program on this computer is using
-  8443, Paracord says so when it starts. Pick a different number in your config —
+  8443, Archlast Mercury says so when it starts. Pick a different number in your config —
   for both the app and `[voice] port` — and use that number everywhere above.
 - **The browser warns about the certificate.** That is expected: a fresh server
   makes its own certificate. Choose **Advanced**, then **Continue**. The desktop
@@ -151,7 +151,7 @@ The router is only the first door. Your computer has one too.
 
 ## Turning the automatic attempt off
 
-Paracord asks your router on every start. To stop it — for instance because you
+Archlast Mercury asks your router on every start. To stop it — for instance because you
 have set the rule up by hand and would rather nothing touch it — set:
 
 ```toml
@@ -159,7 +159,7 @@ have set the rule up by hand and would rather nothing touch it — set:
 auto_port_forward = false
 ```
 
-or start the server with `PARACORD_AUTO_PORT_FORWARD=false`. The startup message
+or start the server with `MERCURY_AUTO_PORT_FORWARD=false`. The startup message
 then says so plainly instead of pretending it tried.
 
 ## Is it safe to be reachable?

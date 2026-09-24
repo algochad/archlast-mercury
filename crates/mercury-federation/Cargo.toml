@@ -1,0 +1,22 @@
+[package]
+name = "mercury-federation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+
+[dependencies]
+mercury-db = { workspace = true }
+mercury-models = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+sqlx = { workspace = true }
+ed25519-dalek = { workspace = true }
+reqwest = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+url = { workspace = true }

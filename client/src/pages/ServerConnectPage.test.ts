@@ -81,7 +81,7 @@ describe('the connect wizard explains a CORS refusal', () => {
   });
 
   /**
-   * A Paracord peer sends `Cross-Origin-Resource-Policy: same-origin` on every
+   * A Archlast Mercury peer sends `Cross-Origin-Resource-Policy: same-origin` on every
    * response, `/health` included, so the browser blocks the opaque probe after
    * the answer arrives and it rejects exactly as a dead host does. Verified
    * live: a no-cors probe of a running peer rejects, while the same probe of a
@@ -113,10 +113,10 @@ describe('the connect wizard explains a CORS refusal', () => {
     globalThis.fetch = vi.fn().mockResolvedValue(OPAQUE_RESPONSE);
 
     const message = await explainConnectionFailure(
-      new Error('Not a Paracord instance'),
+      new Error('Not a Archlast Mercury instance'),
       'http://127.0.0.1:18244',
     );
-    expect(message).toContain('it is not a Paracord server');
+    expect(message).toContain('it is not a Archlast Mercury server');
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-# Paracord Design Language — superseded
+# Archlast Mercury Design Language — superseded
 
 **The visual contract is [`docs/lantern-stage-spec.md`](lantern-stage-spec.md)
 ("Lantern Stage").** This file used to hold "Emerald Commons", the v1 system:

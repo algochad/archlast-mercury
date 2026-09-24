@@ -18,7 +18,7 @@ import {
 
 describe('constants', () => {
   it('has correct app name', () => {
-    expect(APP_NAME).toBe('Paracord');
+    expect(APP_NAME).toBe('Archlast Mercury');
   });
 
   it('has correct API version', () => {

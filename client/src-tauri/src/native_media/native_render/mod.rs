@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use paracord_codec::video::DecodedFrameHandle;
+use mercury_codec::video::DecodedFrameHandle;
 
 #[cfg(target_os = "linux")]
 pub mod linux;

@@ -221,7 +221,7 @@ Run from `client/`.
 ### Screenshots
 
 ```bash
-PARACORD_E2E_DESIGN=1 PARACORD_E2E_DESIGN_WP=wp5 npx playwright test e2e/design-review.spec.ts
+MERCURY_E2E_DESIGN=1 MERCURY_E2E_DESIGN_WP=wp5 npx playwright test e2e/design-review.spec.ts
 # → output/design-reference/wp5/ (gitignored)
 ```
 

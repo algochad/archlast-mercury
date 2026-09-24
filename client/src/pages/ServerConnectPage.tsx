@@ -72,7 +72,7 @@ async function probeServerViaTauri(serverUrl: string): Promise<{ name: string; c
   const { invoke } = await import('@tauri-apps/api/core');
   const data = await invoke<{ service?: string; name?: string }>('probe_server', { serverUrl });
   if (data.service !== 'paracord') {
-    throw new Error('Not a Paracord instance');
+    throw new Error('Not a Archlast Mercury instance');
   }
   const canonicalServerUrl = canonicalServerBaseFromResolvedUrl(serverUrl);
   let fallbackName = canonicalServerUrl;
@@ -113,7 +113,7 @@ export class CorsBlockedError extends Error {
  * server they are connecting to — so the message names the host, the exact
  * setting its operator needs, and the fact that the desktop app is unaffected.
  * Credentialed CORS cannot reflect an arbitrary origin (that would let any
- * website drive a signed-in user's Paracord server), so an allowlist is the
+ * website drive a signed-in user's Archlast Mercury server), so an allowlist is the
  * only safe answer and the operator has to say the word.
  */
 export function corsBlockedMessage(host: string, origin: string): string {
@@ -129,10 +129,10 @@ export function corsBlockedMessage(host: string, origin: string): string {
  * either.
  *
  * The probe only works against a server that lets an opaque response through.
- * Paracord does not: every response carries
+ * Archlast Mercury does not: every response carries
  * `Cross-Origin-Resource-Policy: same-origin`, `/health` included, so the
  * browser discards the opaque answer after it arrives and the probe rejects
- * exactly as an unreachable host does. Against another Paracord server — the
+ * exactly as an unreachable host does. Against another Archlast Mercury server — the
  * only kind this page connects to — the question is therefore unanswerable
  * from here, and the honest message is both possibilities rather than a
  * confident "check DNS" for what is usually a one-line setting on the other
@@ -211,7 +211,7 @@ async function probeServerViaFetch(serverUrl: string): Promise<{ name: string; c
   if (!resp.ok) throw new Error('The instance returned an error');
   const data = await resp.json();
   if (data.service !== 'paracord') {
-    throw new Error('Not a Paracord instance');
+    throw new Error('Not a Archlast Mercury instance');
   }
   const canonicalServerUrl = canonicalServerBaseFromResolvedUrl(resp.url || serverUrl);
   let fallbackName = canonicalServerUrl;
@@ -226,7 +226,7 @@ async function probeServerViaFetch(serverUrl: string): Promise<{ name: string; c
   };
 }
 
-/** Probe /health and verify this is a Paracord instance. Uses Rust-side HTTP in Tauri, fetch in browser. */
+/** Probe /health and verify this is a Archlast Mercury instance. Uses Rust-side HTTP in Tauri, fetch in browser. */
 async function probeServer(serverUrl: string): Promise<{ name: string; canonicalServerUrl: string }> {
   if (isTauri()) {
     return probeServerViaTauri(serverUrl);
@@ -250,7 +250,7 @@ export function toFriendlyConnectionError(err: unknown): string {
     return 'Could not connect. Check the link, and ask whoever runs the server whether it is up.';
   }
   if (lower.includes('not a paracord instance')) {
-    return 'Something answered at that address, but it is not a Paracord server. Check the link for a typo.';
+    return 'Something answered at that address, but it is not a Archlast Mercury server. Check the link for a typo.';
   }
   if (lower.includes('timed out')) {
     return 'The server did not answer. It may be switched off, or not reachable from your network. Ask whoever runs it, then try again.';

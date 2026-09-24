@@ -79,7 +79,7 @@ This page documents support boundaries for the v3.1.0 release. Items here are no
   those machines WebKitGTK either aborts the Wayland connection
   (`Gdk-Message: Error 71 (Protocol error)`) or segfaults inside
   `libnvidia-eglcore` as soon as it composites, and the window never paints a
-  pixel. A twenty-line GTK + WebKit program reproduces it with none of Paracord
+  pixel. A twenty-line GTK + WebKit program reproduces it with none of Archlast Mercury
   involved, so the app detects the NVIDIA EGL vendor at startup and sets
   WebKit's `hardware-acceleration-policy` to `Never`. Note that the older
   `WEBKIT_DISABLE_COMPOSITING_MODE` and `WEBKIT_DISABLE_DMABUF_RENDERER`
@@ -88,7 +88,7 @@ This page documents support boundaries for the v3.1.0 release. Items here are no
 - This costs GPU compositing of the **interface** only. Video still decodes and
   renders on the GPU: it goes through the `gtk::GLArea` underlay, which owns its
   own GL context and is unaffected.
-- `PARACORD_WEBKIT_ACCELERATION=never|ondemand|always` overrides the choice, for
+- `MERCURY_WEBKIT_ACCELERATION=never|ondemand|always` overrides the choice, for
   a machine whose driver has since been fixed or one that misbehaves without
   NVIDIA. Everything else on Linux keeps WebKit's own default (`ondemand`).
 - The published **AppImage** is a separate problem and is still affected: it
@@ -107,7 +107,7 @@ This page documents support boundaries for the v3.1.0 release. Items here are no
 - The voice connection check reports a real transport attempt from the client's network, but it deliberately stops short of authenticating with the relay: a diagnostic session carries no call token, and the relay only acknowledges tokens bound to an active call. A passing transport step therefore proves the UDP path, the QUIC handshake and the certificate — not that a join would be authorised.
 - Inside the desktop app the media connection is opened by the native QUIC stack in the Tauri binary, which has no probe that avoids joining a call. The desktop check reports the transport step as skipped, with that reason, instead of guessing. Running the same check from a browser against the same server does exercise the UDP path.
 - Browser voice needs a browser that can pin a self-signed certificate by fingerprint (`serverCertificateHashes`). Chromium-based browsers implement it; Firefox and Safari do not, so they cannot join native-media calls on a self-hosted server. The connection check reports this at the certificate step rather than letting the connection fail opaquely.
-- The media certificate is **short-lived by necessity**. Chromium accepts a `serverCertificateHashes` pin only for an ECDSA P-256 certificate whose total validity window is at most 14 days, so the server issues one valid for 13 days (back-dated an hour for clock skew) and rotates it roughly every 7 days while it runs. Rotation swaps the certificate the media port presents and republishes the fingerprint atomically; calls already in progress are unaffected, because QUIC authenticates once at handshake. This is entirely internal to the media port — an operator running a reverse proxy in front of Paracord never supplies, renews or sees this certificate, and a CA-issued certificate configured for HTTPS is never presented on the QUIC media port.
+- The media certificate is **short-lived by necessity**. Chromium accepts a `serverCertificateHashes` pin only for an ECDSA P-256 certificate whose total validity window is at most 14 days, so the server issues one valid for 13 days (back-dated an hour for clock skew) and rotates it roughly every 7 days while it runs. Rotation swaps the certificate the media port presents and republishes the fingerprint atomically; calls already in progress are unaffected, because QUIC authenticates once at handshake. This is entirely internal to the media port — an operator running a reverse proxy in front of Archlast Mercury never supplies, renews or sees this certificate, and a CA-issued certificate configured for HTTPS is never presented on the QUIC media port.
 - Because the fingerprint changes, it is a **fresh** fact rather than a per-server constant. Clients read it on every voice join and again before every reconnect, and a handshake refused with a fingerprint that turns out to be stale is retried once against the freshly published one. A fingerprint copied out of a log or pinned in external tooling will stop matching within days; read it from `GET /api/v1/voice/transport-diagnostics` instead.
 - Native QUIC/WebTransport media is the default voice/video path (`[voice] native_media = true`). LiveKit is an optional fallback for legacy WebRTC interop or SFU-scale rooms; set `native_media = false` and configure LiveKit to use it.
 - Desktop native input and output device switching both work at runtime; switching the speaker/output device rebinds the active playback sinks in place.
@@ -131,29 +131,29 @@ This page documents support boundaries for the v3.1.0 release. Items here are no
 - A federation request is **addressed to the peer's `server_name`**, not to the hostname in
   its `federation_endpoint`, and the receiver refuses anything addressed to a name it does
   not answer to. Register a peer under the `server_name` that peer publishes at
-  `/.well-known/paracord/server`; a peer registered under a made-up name will be refused
+  `/.well-known/mercury/server`; a peer registered under a made-up name will be refused
   with `403` and a `destination binding mismatch` warning in the receiver's log naming both
-  values. A receiver also accepts the host of its own `PARACORD_PUBLIC_URL` as an alias for
+  values. A receiver also accepts the host of its own `MERCURY_PUBLIC_URL` as an alias for
   itself, which is what lets a pre-3.0.0 sender keep delivering during a rolling upgrade.
 
 ## Multi-Server From A Browser
 
-- Adding a **second** server from a browser-served Paracord requires that server's
+- Adding a **second** server from a browser-served Archlast Mercury requires that server's
   operator to allow this page's origin. The browser sends the connect probe and every
   later API call cross-origin with credentials, and a credentialed cross-origin request
-  is only answered for an origin on the target server's allowlist. Paracord ships that
+  is only answered for an origin on the target server's allowlist. Archlast Mercury ships that
   allowlist closed (the Tauri origins and the Vite dev servers, plus
-  `PARACORD_PUBLIC_URL`), because the alternative — reflecting whatever `Origin` arrives
+  `MERCURY_PUBLIC_URL`), because the alternative — reflecting whatever `Origin` arrives
   and answering with `Access-Control-Allow-Credentials: true` — would let *any* website
-  a signed-in user visits drive their Paracord server with their cookies.
+  a signed-in user visits drive their Archlast Mercury server with their cookies.
 - The fix is one setting on the **server being added**, not on the one serving the page:
 
   ```bash
   # On the server being added. Comma-separated; scheme + host + port, no trailing slash.
-  PARACORD_CORS_ALLOWED_ORIGINS=https://chat.example.com,http://127.0.0.1:18240
+  MERCURY_CORS_ALLOWED_ORIGINS=https://chat.example.com,http://127.0.0.1:18240
   ```
 
-  `PARACORD_PUBLIC_URL` is allowed automatically, so a server that already sets it accepts
+  `MERCURY_PUBLIC_URL` is allowed automatically, so a server that already sets it accepts
   its own origin without further configuration.
 - **The desktop app is not affected.** Tauri issues requests from a fixed
   `tauri://localhost` origin that is always on the allowlist, so multi-server works between
@@ -176,13 +176,13 @@ This page documents support boundaries for the v3.1.0 release. Items here are no
 
 ## Docker
 
-- The Docker quick start is HTTP-only inside the container by default (`PARACORD_TLS_ENABLED=false`). Terminate TLS at a reverse proxy for production; browsers block mic/camera/screen-share on plain HTTP, so browser voice needs HTTPS in front of the stack.
-- Docker Compose is zero-config: no `.env` and no secrets are required. The server generates and persists a random `jwt_secret` into the `/data` volume on first run and reuses it across restarts. Native QUIC/WebTransport voice is the default; LiveKit is an opt-in profile (`docker compose --profile livekit up -d`). The LiveKit shared secret (`PARACORD_LIVEKIT_API_SECRET`) defaults to a local dev value and should be overridden in `.env` before exposing LiveKit to a network.
+- The Docker quick start is HTTP-only inside the container by default (`MERCURY_TLS_ENABLED=false`). Terminate TLS at a reverse proxy for production; browsers block mic/camera/screen-share on plain HTTP, so browser voice needs HTTPS in front of the stack.
+- Docker Compose is zero-config: no `.env` and no secrets are required. The server generates and persists a random `jwt_secret` into the `/data` volume on first run and reuses it across restarts. Native QUIC/WebTransport voice is the default; LiveKit is an opt-in profile (`docker compose --profile livekit up -d`). The LiveKit shared secret (`MERCURY_LIVEKIT_API_SECRET`) defaults to a local dev value and should be overridden in `.env` before exposing LiveKit to a network.
 
 ## Database And Upgrades
 
 - SQLite is supported for small/self-hosted instances. PostgreSQL is recommended for sustained multi-user production deployments.
-- The `paracord-server migrate-to-postgres` subcommand copies an existing SQLite database into a freshly migrated PostgreSQL database, verifying copied row counts and committing tail repair plus a new database history epoch with the copied rows. Target schema migrations and seed rows run first and remain applied on later failure or `--dry-run`; dry runs copy no source rows. It is an offline maintenance-window tool: stop the server and keep the SQLite file idle while it runs. It does not perform live/zero-downtime replication.
+- The `mercury-server migrate-to-postgres` subcommand copies an existing SQLite database into a freshly migrated PostgreSQL database, verifying copied row counts and committing tail repair plus a new database history epoch with the copied rows. Target schema migrations and seed rows run first and remain applied on later failure or `--dry-run`; dry runs copy no source rows. It is an offline maintenance-window tool: stop the server and keep the SQLite file idle while it runs. It does not perform live/zero-downtime replication.
 - Schema rollback is not supported. Back up the database and media before applying migrations.
 - Current local upgrade evidence includes synthetic SQLite tag-schema validation from `v0.9.0`; a real released user database snapshot still needs to be validated before public release.
 

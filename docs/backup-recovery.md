@@ -1,6 +1,6 @@
 # Backup and offline recovery
 
-`paracord-server restore-backup` prepares and verifies a separate recovery
+`mercury-server restore-backup` prepares and verifies a separate recovery
 installation. It writes a new directory and, for PostgreSQL, restores into a
 new empty database. It never selects that installation for the running server.
 Stop every instance using the old database before activating the recovered one.
@@ -14,17 +14,17 @@ report that recovery has succeeded.
 
 Keep the following together in protected backup storage:
 
-- The Paracord `.tar.gz` archive. Include media for local storage. A database
+- The Archlast Mercury `.tar.gz` archive. Include media for local storage. A database
   snapshot alone cannot recover uploads or native media files.
-- The original `paracord.toml` and its deployment environment. The config holds
+- The original `mercury.toml` and its deployment environment. The config holds
   authentication settings and the JWT secret; environment overrides may hold
   other secrets and change the effective database or storage settings.
 - The original at-rest master key from the environment variable named by
   `[at_rest].key_env`, if encryption is enabled. Keep the original encryption
   settings. The CLI does not generate replacement encryption keys.
-- The TLS certificate and private key when Paracord terminates TLS, and the
+- The TLS certificate and private key when Archlast Mercury terminates TLS, and the
   federation signing key when federation is enabled. These are separate files,
-  not certificate/key bytes embedded in `paracord.toml`.
+  not certificate/key bytes embedded in `mercury.toml`.
 - For database-only archives or S3 storage, a matching media export containing
   both `uploads/` and `files/`. Preserve encrypted bytes, relative object names,
   and attachment filenames. The command does not download S3 objects; recovery
@@ -34,7 +34,7 @@ Current admin and scheduled backups use the already-open, keyed SQLite pool or
 `pg_dump` on PostgreSQL. Version 2 archives include encryption metadata and an
 authenticated key check when at-rest encryption is enabled. They do **not**
 include the master key, original config, TLS keys, or federation key. Earlier
-version 1 Paracord archives are also accepted, with verification based on the
+version 1 Archlast Mercury archives are also accepted, with verification based on the
 supplied configuration and stored data. Raw `.sql`, `.db`, or `.pgdump` files
 are not inputs to this command.
 
@@ -52,9 +52,9 @@ must not exist; its parent must exist. Keep it outside any `--media-dir` export
 to prevent staging from becoming part of its own input.
 
 ```bash
-paracord-server --config /srv/paracord/paracord.toml restore-backup \
-  --archive /srv/backups/paracord-backup.tar.gz \
-  --output-dir /srv/paracord-recovery-20260912
+mercury-server --config /srv/archlast-mercury/mercury.toml restore-backup \
+  --archive /srv/backups/mercury-backup.tar.gz \
+  --output-dir /srv/mercury-recovery-20260912
 ```
 
 For a database-only archive, add:
@@ -74,19 +74,19 @@ the supplied configuration requires encrypted SQLite.
 
 Install `pg_restore` compatible with the dump's `pg_dump` version. Create a
 separate empty database with a dedicated recovery identity. Keep it isolated:
-no Paracord instances or other clients may connect during preparation. Use a
+no Archlast Mercury instances or other clients may connect during preparation. Use a
 trusted archive and a database identity with only the permissions needed for
 that recovery database.
 
 For example, using your configured PostgreSQL administration connection:
 
 ```bash
-createdb --owner=paracord_recovery paracord_recovery_20260912
-export PARACORD_RECOVERY_DATABASE_URL='postgres://paracord_recovery@localhost/paracord_recovery_20260912'
-paracord-server --config /srv/paracord/paracord.toml restore-backup \
-  --archive /srv/backups/paracord-backup.tar.gz \
-  --output-dir /srv/paracord-recovery-20260912 \
-  --postgres-url-env PARACORD_RECOVERY_DATABASE_URL
+createdb --owner=mercury_recovery mercury_recovery_20260912
+export MERCURY_RECOVERY_DATABASE_URL='postgres://mercury_recovery@localhost/mercury_recovery_20260912'
+mercury-server --config /srv/archlast-mercury/mercury.toml restore-backup \
+  --archive /srv/backups/mercury-backup.tar.gz \
+  --output-dir /srv/mercury-recovery-20260912 \
+  --postgres-url-env MERCURY_RECOVERY_DATABASE_URL
 ```
 
 Provision credentials with your deployment's secret mechanism. The target URL
@@ -110,7 +110,7 @@ A successful preparation produces:
 | File | Purpose |
 | --- | --- |
 | `verification.json` | Archive SHA-256, database engine, fresh history epoch, application table counts, repaired tail count, verified attachment/encrypted-secret counts, copied media-file count |
-| `paracord.toml` | Recovered configuration, published only after successful preparation |
+| `mercury.toml` | Recovered configuration, published only after successful preparation |
 | `activate.sh`, `activate.ps1` | Launch commands with the recovery database/storage and encryption-setting environment overrides |
 | `ACTIVATE.md` | Cutover and rollback checklist |
 | `keys/` | Validated TLS and federation material copied from the original deployment, when enabled |
@@ -137,10 +137,10 @@ Ordinary server restarts preserve the database's history UUID.
 
 1. Read `verification.json` and `ACTIVATE.md`. Keep the original archive,
    config, environment and database/media untouched until cutover is validated.
-2. Stop **all** Paracord instances connected to the old database. Prevent a
+2. Stop **all** Archlast Mercury instances connected to the old database. Prevent a
    service supervisor from restarting them with the old configuration.
 3. Supply the original at-rest master key if enabled. Launch the generated
-   script with `sh /srv/paracord-recovery-20260912/activate.sh` on Unix or
+   script with `sh /srv/mercury-recovery-20260912/activate.sh` on Unix or
    `powershell -File .../activate.ps1` on Windows. Alternatively install the
    generated config and its environment overrides into the service definition.
    Retained database/storage overrides from the old service must be replaced.
@@ -176,5 +176,5 @@ before choosing an older history again. Do not operate both generations as
 writers for the same service identity.
 
 `scripts/restore-db.sh` is a Unix wrapper for this CLI and accepts the original
-config, Paracord archive, new directory, and optional restore arguments. It no
+config, Archlast Mercury archive, new directory, and optional restore arguments. It no
 longer runs an in-place raw PostgreSQL restore.

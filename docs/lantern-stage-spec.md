@@ -1,4 +1,4 @@
-# Paracord Design Language v2 — "Lantern Stage"
+# Archlast Mercury Design Language v2 — "Lantern Stage"
 
 > **This file is the contract for the v2 UI overhaul.** It supersedes the visual
 > law in `docs/design-spec.md` ("Emerald Commons") and amends the IA law in
@@ -12,7 +12,7 @@
 
 ## 0. The idea, in one paragraph
 
-Paracord is **lit windows at night, and light means people.** Every server you
+Archlast Mercury is **lit windows at night, and light means people.** Every server you
 belong to is a facade of windows; every channel in it is one window. A window is
 lit when someone is in the channel — **white light** for a voice channel with
 people talking, **amber light** for a text channel with people reading — and
@@ -29,7 +29,7 @@ quiet.
 **server**. The thing inside it is a **channel** — a **text channel** or a
 **voice channel**; you *join voice* or *join the call*, you never "enter a
 room". The host somebody runs, connects to and claims is an **instance**:
-"Connect to an instance", "Instance address", "Trust new Paracord instance?".
+"Connect to an instance", "Instance address", "Trust new Archlast Mercury instance?".
 `guild`, `guild_id` and the routes keep their wire names. The words
 "building", "room" and "space" are retired from every user-facing surface, and
 `client/src/lib/vocabulary.test.ts` fails the build if one comes back.
@@ -237,7 +237,7 @@ Rules a look lives by:
 
 - **Voices is the default (2026-09-20).** A fresh install, and an account that
   never chose a theme, gets Voices: `DEFAULT_THEME` in `client/src/lib/themes.ts`
-  and in `crates/paracord-api/src/routes/users.rs` must agree, because the client
+  and in `crates/mercury-api/src/routes/users.rs` must agree, because the client
   adopts the server's value on first sign-in. Night remains one click away.
 - **It brings its own colours.** A look defines its accent and its grounds, so
   the accent presets and the base-colour control are inert (shown disabled, with

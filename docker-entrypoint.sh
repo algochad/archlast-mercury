@@ -12,9 +12,12 @@ set -eu
 
 # Ensure the persistent data layout exists before the server starts. Safe to run
 # repeatedly; existing directories and the persisted config are left untouched.
+# Compat: if old config/db exists and new does not, copy to new path
+[ -f /data/mercury.toml ] || [ ! -f /data/paracord.toml ] || cp -a /data/paracord.toml /data/mercury.toml
+[ -f /data/mercury.db ] || [ ! -f /data/paracord.db ] || cp -a /data/paracord.db /data/mercury.db
 for dir in /data /data/uploads /data/files /data/certs /data/backups; do
-    [ -d "$dir" ] || mkdir -p "$dir"
-done
+     [ -d "$dir" ] || mkdir -p "$dir"
+ done
 
 # Hand off to the CMD (paracord-server --config /data/paracord.toml). The server
 # creates /data/paracord.toml with a freshly generated jwt_secret on first run

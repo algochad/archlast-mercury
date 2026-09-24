@@ -6,7 +6,7 @@
  * from theft, so it revokes **every** session the account has. That is the
  * correct response to theft and a catastrophic response to a race.
  *
- * Paracord used to race itself. Four call sites refreshed the *same* home
+ * Archlast Mercury used to race itself. Four call sites refreshed the *same* home
  * credential on their own — the legacy `apiClient` singleton, the per-server
  * axios instance built by `createApiClient()` (one per connection, each with
  * its own guard), `connectionManager.refreshServerSession()`, and session

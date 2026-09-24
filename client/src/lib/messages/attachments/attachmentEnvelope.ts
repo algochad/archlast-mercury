@@ -215,7 +215,7 @@ export function decodeEncryptedBody(plaintext: string): EncryptedMessageBody {
   const body = parsed as Record<string, unknown>;
   if (body.v !== ENCRYPTED_BODY_VERSION) {
     throw new EncryptedBodyError(
-      `This message uses encrypted body format ${String(body.v)}, which this version of Paracord cannot read. Update Paracord to open it.`,
+      `This message uses encrypted body format ${String(body.v)}, which this version of Archlast Mercury cannot read. Update Archlast Mercury to open it.`,
     );
   }
   if (typeof body.text !== 'string') throw new EncryptedBodyError('This encrypted message body could not be read.');

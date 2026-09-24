@@ -1,7 +1,7 @@
 /**
  * Mention helpers shared by the gateway dispatch path and the message feed.
  *
- * `mention_everyone` is typed as a required boolean, but no Paracord server
+ * `mention_everyone` is typed as a required boolean, but no Archlast Mercury server
  * actually emits the field — `build_message_json` never sets it. Reading it
  * directly therefore evaluated to `undefined` on every real message, which is
  * why @everyone highlighting and @everyone mention badges never fired for

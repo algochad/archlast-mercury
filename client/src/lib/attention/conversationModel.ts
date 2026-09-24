@@ -7,7 +7,7 @@ import { entityScopeKey, type AccountScope } from '../serverScope';
  * consumed later by `useUnifiedConversations` and the sidebar components.
  */
 
-/** Paracord custom snowflake epoch: 2024-01-01T00:00:00Z (ms). */
+/** Archlast Mercury custom snowflake epoch: 2024-01-01T00:00:00Z (ms). */
 export const EPOCH_MS = 1704067200000;
 
 export type ConversationKind =

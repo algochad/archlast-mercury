@@ -1,6 +1,6 @@
 # SQLite → PostgreSQL Migration
 
-Paracord runs on either SQLite (single-file, zero-ops) or PostgreSQL (for
+Archlast Mercury runs on either SQLite (single-file, zero-ops) or PostgreSQL (for
 larger / multi-instance deployments). When a server outgrows SQLite, the
 `migrate-to-postgres` subcommand copies an existing SQLite database into a
 PostgreSQL database in one pass.
@@ -8,12 +8,12 @@ PostgreSQL database in one pass.
 ## Invocation
 
 ```bash
-paracord-server migrate-to-postgres \
-    --source sqlite://./data/paracord.db \
-    --target postgres://user:pass@db-host:5432/paracord
+mercury-server migrate-to-postgres \
+    --source sqlite://./data/mercury.db \
+    --target postgres://user:pass@db-host:5432/mercury
 ```
 
-> The migration target may be the compose `postgres` service: start it with `docker compose --profile postgres up -d postgres`, then reach it from the host via `docker compose --profile postgres exec postgres psql -U paracord -d paracord` checks or a temporary `ports: ["127.0.0.1:5432:5432"]` mapping for the `--target postgresql://…@127.0.0.1:5432/paracord` URL (remove the mapping afterwards).
+> The migration target may be the compose `postgres` service: start it with `docker compose --profile postgres up -d postgres`, then reach it from the host via `docker compose --profile postgres exec postgres psql -U mercury -d mercury` checks or a temporary `ports: ["127.0.0.1:5432:5432"]` mapping for the `--target postgresql://…@127.0.0.1:5432/mercury` URL (remove the mapping afterwards).
 
 The command does **not** start the chat server; it runs the migration and
 exits, printing a per-table report of the rows it copied.
@@ -106,14 +106,14 @@ PostgreSQL time columns retain their fractional seconds.
 ## Table-order guarantee
 
 Tables are copied in a fixed, foreign-key-safe order
-(`MIGRATION_TABLE_ORDER` in `crates/paracord-db/src/migrate_export.rs`): a table
+(`MIGRATION_TABLE_ORDER` in `crates/mercury-db/src/migrate_export.rs`): a table
 only appears after every table it has a foreign key into, so PostgreSQL's
 immediate foreign-key checks are always satisfied at insert time. A unit test
 (`migration_table_order_matches_schema`) fails CI whenever a new table is added
 to the migrations but not to this list, keeping the order authoritative.
 
 Within each table, rows are streamed in **ascending primary-key order**. Because
-Paracord primary keys are Snowflake IDs (monotonic with creation time), a
+Archlast Mercury primary keys are Snowflake IDs (monotonic with creation time), a
 self-referential foreign key (e.g. `channels.parent_id`, `messages.reference_id`)
 always points at a row with a smaller id that has therefore already been
 inserted.
@@ -132,5 +132,5 @@ or derived state that PostgreSQL rebuilds on its own:
 ## After migrating
 
 Point the server at the PostgreSQL database (set `database.url` /
-`database.engine` in `config/paracord.toml`) and start it. Keep the original
+`database.engine` in `config/mercury.toml`) and start it. Keep the original
 SQLite file as a backup until you have verified the PostgreSQL deployment.

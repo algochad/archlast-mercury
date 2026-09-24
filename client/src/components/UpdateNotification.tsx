@@ -6,8 +6,8 @@ import { safeExternalUrl } from '../lib/security';
 import { isTauri } from '../lib/tauriEnv';
 import { Button } from './ui/Button';
 
-const GITHUB_OWNER = (import.meta.env.VITE_GITHUB_OWNER as string | undefined)?.trim() || 'Scoduglas1999';
-const GITHUB_REPO = (import.meta.env.VITE_GITHUB_REPO as string | undefined)?.trim() || 'Paracord';
+const GITHUB_OWNER = (import.meta.env.VITE_GITHUB_OWNER as string | undefined)?.trim() || 'algochad';
+const GITHUB_REPO = (import.meta.env.VITE_GITHUB_REPO as string | undefined)?.trim() || 'archlast-mercury';
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
 const DISMISSED_RELEASE_STORAGE_KEY = 'paracord.update.dismissed.release';
 
@@ -110,7 +110,7 @@ function extractUpdateInfo(update: Update, target: string | null): AvailableUpda
         ? rawJson.published_at
         : update.date ?? null;
   const assetUrl = readAssetUrl(rawJson, target);
-  const assetName = assetUrl ? fileNameFromUrl(assetUrl) : `Paracord ${version} update`;
+  const assetName = assetUrl ? fileNameFromUrl(assetUrl) : `Archlast Mercury ${version} update`;
 
   return {
     version,
@@ -310,7 +310,7 @@ export function UpdateNotification() {
             {downloaded ? 'Update ready to install' : 'New release available'}
           </div>
           <div className="mt-0.5 text-meta text-text-secondary">
-            Paracord {updateInfo.version}
+            Archlast Mercury {updateInfo.version}
             {updateInfo.publishedAt
               ? ` · ${new Date(updateInfo.publishedAt).toLocaleDateString()}`
               : ''}

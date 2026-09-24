@@ -34,10 +34,10 @@ PASSWORD = "Paracord!Federation!123"
 
 
 def resolve_server_binary() -> Path:
-    """Find the `paracord-server` this checkout built, on any platform.
+    """Find the `mercury-server` this checkout built, on any platform.
 
     These validations were written against a Windows debug build and hard-coded
-    `target/debug/paracord-server.exe`, which does not exist on Linux or macOS —
+    `target/debug/mercury-server.exe`, which does not exist on Linux or macOS —
     or in a release pipeline, which only builds `--release`. Look for both
     profiles and both file names, preferring the release binary the rest of the
     release smokes use, and let `PARACORD_FED_SERVER_BIN` override.

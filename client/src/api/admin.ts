@@ -195,7 +195,7 @@ export const adminApi = {
   // Federation server management (admin only)
   listFederatedServers: async () =>
     getApi().get<{ servers: FederatedServer[] }>(
-      resolveServerRootUrl('/_paracord/federation/v1/servers')
+      resolveServerRootUrl('/_mercury/federation/v1/servers')
     ),
 
   addFederatedServer: async (data: {
@@ -207,21 +207,21 @@ export const adminApi = {
     trusted?: boolean;
     discover?: boolean;
   }) =>
-    getApi().post(resolveServerRootUrl('/_paracord/federation/v1/servers'), data),
+    getApi().post(resolveServerRootUrl('/_mercury/federation/v1/servers'), data),
 
   getFederatedServer: async (serverName: string) =>
     getApi().get<FederatedServer>(
-      resolveServerRootUrl(`/_paracord/federation/v1/servers/${encodeURIComponent(serverName)}`)
+      resolveServerRootUrl(`/_mercury/federation/v1/servers/${encodeURIComponent(serverName)}`)
     ),
 
   deleteFederatedServer: async (serverName: string) =>
     getApi().delete(
-      resolveServerRootUrl(`/_paracord/federation/v1/servers/${encodeURIComponent(serverName)}`)
+      resolveServerRootUrl(`/_mercury/federation/v1/servers/${encodeURIComponent(serverName)}`)
     ),
 
   listModerationState: async () =>
     getApi().get<{ states: FederationPeerTrustState[] }>(
-      resolveServerRootUrl('/_paracord/federation/v1/moderation/state')
+      resolveServerRootUrl('/_mercury/federation/v1/moderation/state')
     ),
 
   applyModerationList: async (data: {
@@ -234,13 +234,13 @@ export const adminApi = {
     }>;
   }) =>
     getApi().post<{ source: string; applied: number }>(
-      resolveServerRootUrl('/_paracord/federation/v1/moderation/apply'),
+      resolveServerRootUrl('/_mercury/federation/v1/moderation/apply'),
       data
     ),
 
   listModerationSubscriptions: async () =>
     getApi().get<{ subscriptions: FederationModerationSubscription[] }>(
-      resolveServerRootUrl('/_paracord/federation/v1/moderation/subscriptions')
+      resolveServerRootUrl('/_mercury/federation/v1/moderation/subscriptions')
     ),
 
   upsertModerationSubscription: async (data: {
@@ -249,14 +249,14 @@ export const adminApi = {
     enabled?: boolean;
   }) =>
     getApi().post(
-      resolveServerRootUrl('/_paracord/federation/v1/moderation/subscriptions'),
+      resolveServerRootUrl('/_mercury/federation/v1/moderation/subscriptions'),
       data
     ),
 
   deleteModerationSubscription: async (subscriptionId: string) =>
     getApi().delete(
       resolveServerRootUrl(
-        `/_paracord/federation/v1/moderation/subscriptions/${encodeURIComponent(subscriptionId)}`
+        `/_mercury/federation/v1/moderation/subscriptions/${encodeURIComponent(subscriptionId)}`
       )
     ),
 };

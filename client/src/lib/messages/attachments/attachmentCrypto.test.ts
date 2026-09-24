@@ -4,7 +4,7 @@ import {
   base64ToBytes, decryptAttachmentBytes, encryptAttachmentBytes, opaqueObjectName, sha256Hex,
 } from './attachmentCrypto';
 
-const body = new TextEncoder().encode('Paracord attachment confidentiality marker');
+const body = new TextEncoder().encode('Archlast Mercury attachment confidentiality marker');
 
 describe('per-file attachment encryption', () => {
   it('round-trips a file under a fresh key and verifies its plaintext hash', async () => {
@@ -17,7 +17,7 @@ describe('per-file attachment encryption', () => {
 
     const opened = await decryptAttachmentBytes(sealed.ciphertext, sealed.material,
       { size: sealed.size, sha256: sealed.sha256 });
-    expect(new TextDecoder().decode(opened)).toBe('Paracord attachment confidentiality marker');
+    expect(new TextDecoder().decode(opened)).toBe('Archlast Mercury attachment confidentiality marker');
   });
 
   it('gives every file its own key and nonce', async () => {

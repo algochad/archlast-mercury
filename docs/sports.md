@@ -89,9 +89,9 @@ You can replay a finished game so the scoreboard moves without waiting for a
 real one. Set these before you start the server:
 
 ```bash
-PARACORD_SPORTS_REPLAY=football/nfl/401872945,baseball/mlb/401817029
-PARACORD_SPORTS_REPLAY_SPEED=30
-PARACORD_SPORTS_REPLAY_START=2026-09-21T00:30:00Z
+MERCURY_SPORTS_REPLAY=football/nfl/401872945,baseball/mlb/401817029
+MERCURY_SPORTS_REPLAY_SPEED=30
+MERCURY_SPORTS_REPLAY_START=2026-09-21T00:30:00Z
 ```
 
 The first is which games to replay. The second is how fast: 30 means thirty

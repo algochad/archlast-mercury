@@ -1,6 +1,6 @@
 import { accountScopeKey, type AccountScope } from './serverScope';
 
-export const DATABASE_HISTORY_HEADER = 'X-Paracord-History-Epoch';
+export const DATABASE_HISTORY_HEADER = 'X-Mercury-History-Epoch';
 const epochs = new Map<string, string | null>();
 const operations = new Map<string, Set<() => void>>();
 const resets = new Map<string, (scope: AccountScope) => void>();

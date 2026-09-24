@@ -174,7 +174,7 @@ study's ratios (8px/.5 → 18px/.95 → 14px/.8) and pushes the fill toward
 
 ## 4. The gate — `client/e2e/motion-gate.spec.ts`
 
-`PARACORD_E2E_MOTION=1 npx playwright test`, or `npm run test:motion`. Mocked
+`MERCURY_E2E_MOTION=1 npx playwright test`, or `npm run test:motion`. Mocked
 exactly like the smoke (`e2e/fixtures/motionFixture.ts`), on the same dev server
 and port. A `requestAnimationFrame` sampler runs across each moment and records
 every frame interval **together with what the engine had in flight when that
@@ -260,7 +260,7 @@ package's captures). Regenerate with:
 
 ```
 cd client
-PARACORD_E2E_MOTION=1 PARACORD_E2E_MOTION_FRAMES=1 npx playwright test --grep "frame strip"
+MERCURY_E2E_MOTION=1 MERCURY_E2E_MOTION_FRAMES=1 npx playwright test --grep "frame strip"
 ```
 
 - `say-0000ms.png` … `say-0900ms.png` — the send moment at 1280×800, one frame

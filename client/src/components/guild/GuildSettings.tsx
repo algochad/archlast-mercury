@@ -571,7 +571,7 @@ export function GuildSettings({ guildId, guildName, onClose, initialSection, ini
       entries.push({
         id: botId,
         name: meta?.name ?? botId.replace(/_/g, ' '),
-        description: meta?.description ?? 'Native Paracord bot',
+        description: meta?.description ?? 'Native Archlast Mercury bot',
       });
     }
     return entries;

@@ -90,7 +90,7 @@ function ScreenShareSourceCard({
             )}
             {source.isSelf && (
               <span className="inline-flex items-center rounded-[var(--radius-chip)] bg-danger-tint px-1.5 py-0.5 text-meta font-semibold text-accent-danger">
-                Paracord window
+                Archlast Mercury window
               </span>
             )}
           </div>
@@ -187,7 +187,7 @@ export function ScreenSharePickerModal({
               Share your screen
             </h2>
             <p id="screen-share-picker-subtitle" className="mt-1 text-body text-text-secondary">
-              Choose what to share with the call. Desktop capture runs natively in Paracord.
+              Choose what to share with the call. Desktop capture runs natively in Archlast Mercury.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">

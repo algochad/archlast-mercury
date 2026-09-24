@@ -5,9 +5,9 @@ use bytes::{BufMut, BytesMut};
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
 
-use paracord_codec::audio::jitter::JitterBuffer;
-use paracord_codec::audio::opus::{OpusDecoder, FRAME_SIZE};
-use paracord_transport::protocol::{MediaHeader, TrackType, HEADER_SIZE, MAX_STREAM_FRAME_SIZE};
+use mercury_codec::audio::jitter::JitterBuffer;
+use mercury_codec::audio::opus::{OpusDecoder, FRAME_SIZE};
+use mercury_transport::protocol::{MediaHeader, TrackType, HEADER_SIZE, MAX_STREAM_FRAME_SIZE};
 
 use super::session::{NativeMediaSession, RemoteAudioState};
 
@@ -94,7 +94,7 @@ pub fn spawn_audio_send_task(session: &mut NativeMediaSession) {
 
     let handle = tokio::spawn(async move {
         // Per-task codec instances (avoids borrowing from session across await)
-        let mut opus_encoder = match paracord_codec::audio::opus::OpusEncoder::new() {
+        let mut opus_encoder = match mercury_codec::audio::opus::OpusEncoder::new() {
             Ok(e) => e,
             Err(e) => {
                 tracing::error!("audio send task: opus encoder init failed: {e}");
@@ -105,8 +105,8 @@ pub fn spawn_audio_send_task(session: &mut NativeMediaSession) {
         if let Err(e) = opus_encoder.set_bitrate(VOICE_BITRATE_BPS) {
             tracing::warn!("opus bitrate init failed: {e}");
         }
-        let mut echo_canceller = paracord_codec::audio::aec::EchoCanceller::new();
-        let mut noise_suppressor = paracord_codec::audio::noise::NoiseSuppressor::new();
+        let mut echo_canceller = mercury_codec::audio::aec::EchoCanceller::new();
+        let mut noise_suppressor = mercury_codec::audio::noise::NoiseSuppressor::new();
         let mut seq: u16 = 0;
         let mut timestamp: u32 = 0;
         let mut last_loss_update = Instant::now();
@@ -260,7 +260,7 @@ pub fn spawn_screen_audio_send_task(session: &mut NativeMediaSession) {
     let handle = tokio::spawn(async move {
         // Stereo screen-audio encoder (contract C4): 48kHz stereo, Audio
         // application, 192kbps, DTX off. Frames are 1920 interleaved f32.
-        let mut opus_encoder = match paracord_codec::audio::opus::OpusEncoder::new_stream_audio() {
+        let mut opus_encoder = match mercury_codec::audio::opus::OpusEncoder::new_stream_audio() {
             Ok(e) => e,
             Err(e) => {
                 tracing::error!("screen audio send task: opus encoder init failed: {e}");
@@ -283,8 +283,8 @@ pub fn spawn_screen_audio_send_task(session: &mut NativeMediaSession) {
                         let sender_keys = track_sender_keys.lock().await;
                         sender_keys
                             .get(&(
-                                paracord_transport::stream::StreamId::new(stream_id.clone()),
-                                paracord_transport::stream::TrackId::new(track_id.clone()),
+                                mercury_transport::stream::StreamId::new(stream_id.clone()),
+                                mercury_transport::stream::TrackId::new(track_id.clone()),
                             ))
                             .map(|state| state.epoch)
                             .unwrap_or(1)
@@ -888,8 +888,8 @@ mod tests {
     /// per-SSRC/epoch key routing that the send/recv tasks rely on.
     #[test]
     fn audio_frame_round_trips_encode_encrypt_datagram_decrypt_decode() {
-        use paracord_codec::audio::opus::OpusEncoder;
-        use paracord_codec::crypto::{FrameDecryptor, FrameEncryptor, KEY_SIZE};
+        use mercury_codec::audio::opus::OpusEncoder;
+        use mercury_codec::crypto::{FrameDecryptor, FrameEncryptor, KEY_SIZE};
 
         const SSRC: u32 = 0x1234_5678;
         const EPOCH: u8 = 7;

@@ -202,7 +202,7 @@ describe('UserSettings MFA controls', () => {
     vi.mocked(authApi.mfaSetup).mockResolvedValue({
       data: {
         secret: 'totp-secret',
-        otpauth_url: 'otpauth://totp/Paracord:Ada',
+        otpauth_url: 'otpauth://totp/Archlast Mercury:Ada',
         qr_code: 'data:image/png;base64,abc',
       },
     } as never);
@@ -254,7 +254,7 @@ describe('UserSettings MFA controls', () => {
     vi.mocked(authApi.mfaSetup).mockResolvedValue({
       data: {
         secret: 'totp-secret',
-        otpauth_url: 'otpauth://totp/Paracord:Ada',
+        otpauth_url: 'otpauth://totp/Archlast Mercury:Ada',
         qr_code: 'data:image/png;base64,abc',
       },
     } as never);

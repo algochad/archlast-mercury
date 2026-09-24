@@ -1334,7 +1334,7 @@ function SortableChannelItem({
 
               <ToggleRow
                 label="Adaptive slowmode"
-                description="Paracord raises the wait between messages on its own when the channel gets busy."
+                description="Archlast Mercury raises the wait between messages on its own when the channel gets busy."
                 checked={featureSettings.adaptive_slowmode_enabled}
                 onChange={(next) => void patchFeatureSettings({ adaptive_slowmode_enabled: next })}
                 className="py-0"
@@ -1361,7 +1361,7 @@ function SortableChannelItem({
           {!featuresBusy && !featureSettings && (
             <ErrorBanner
               multiline
-              message={`Paracord couldn't read the feature settings for #${channel.name || 'this channel'}. Check your connection and your Manage Channels permission, then open Features again.`}
+              message={`Archlast Mercury couldn't read the feature settings for #${channel.name || 'this channel'}. Check your connection and your Manage Channels permission, then open Features again.`}
             />
           )}
         </Well>

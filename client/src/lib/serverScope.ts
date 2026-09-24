@@ -22,7 +22,7 @@ export function entityKeyBelongsToScope(key: string, scope: AccountScope): boole
 /**
  * Canonical form of a server base URL, for deciding whether two spellings name
  * the same host: lower-cased host, `localhost` folded onto `127.0.0.1`, no
- * trailing slash. Ports and paths are significant — two Paracord instances on
+ * trailing slash. Ports and paths are significant — two Archlast Mercury instances on
  * one machine are two servers.
  */
 export function canonicalServerUrl(url: string): string {

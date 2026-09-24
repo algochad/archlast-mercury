@@ -24,11 +24,11 @@ use serde::Serialize;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use super::{session::NativeMediaSession, video_pipeline, MediaState};
-use paracord_transport::control::{ControlMessage, TrackKind};
-use paracord_transport::stream::PublishedTrack;
+use mercury_transport::control::{ControlMessage, TrackKind};
+use mercury_transport::stream::PublishedTrack;
 #[cfg(feature = "vpx")]
-use paracord_transport::stream::VideoCodec as TransportVideoCodec;
-use paracord_transport::stream::{PublishedLayer, StreamId, TrackId};
+use mercury_transport::stream::VideoCodec as TransportVideoCodec;
+use mercury_transport::stream::{PublishedLayer, StreamId, TrackId};
 
 const EVENT_EVENT: &str = "native_screen_share_event";
 const SCREEN_AUDIO_SAMPLE_RATE: u32 = 48_000;
@@ -703,11 +703,11 @@ pub(crate) fn build_screen_track(_session: &NativeMediaSession) -> Result<Publis
 }
 
 #[cfg(feature = "vpx")]
-fn codec_to_transport_codec(codec: paracord_codec::video::VideoCodec) -> TransportVideoCodec {
+fn codec_to_transport_codec(codec: mercury_codec::video::VideoCodec) -> TransportVideoCodec {
     match codec {
-        paracord_codec::video::VideoCodec::Vp9 => TransportVideoCodec::Vp9,
-        paracord_codec::video::VideoCodec::Av1 => TransportVideoCodec::Av1,
-        paracord_codec::video::VideoCodec::H264 => TransportVideoCodec::H264,
+        mercury_codec::video::VideoCodec::Vp9 => TransportVideoCodec::Vp9,
+        mercury_codec::video::VideoCodec::Av1 => TransportVideoCodec::Av1,
+        mercury_codec::video::VideoCodec::H264 => TransportVideoCodec::H264,
     }
 }
 

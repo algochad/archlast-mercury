@@ -42,7 +42,7 @@ describe('ErrorBoundary', () => {
 
     expect(screen.getByRole('link', { name: 'Report bug' })).toHaveAttribute(
       'href',
-      'https://github.com/Scoduglas1999/Paracord/issues/new',
+      'https://github.com/algochad/archlast-mercury/issues/new',
     );
   });
 });

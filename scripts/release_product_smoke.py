@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release-binary product API smoke test.
 
-Starts `target/release/paracord-server` with a temporary SQLite database and
+Starts `target/release/mercury-server` with a temporary SQLite database and
 validates core product flows through real HTTP requests.
 """
 

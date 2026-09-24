@@ -1,0 +1,398 @@
+use axum::{
+    extract::{Multipart, Path, State},
+    http::StatusCode,
+    Json,
+};
+use mercury_contracts::emoji::{GuildEmoji, UpdateEmojiRequest};
+use mercury_core::AppState;
+use mercury_models::permissions::Permissions;
+use serde_json::json;
+
+use crate::error::ApiError;
+use crate::middleware::AuthUser;
+use crate::routes::audit;
+
+const MAX_EMOJI_NAME_LEN: usize = 32;
+const MAX_EMOJI_IMAGE_SIZE: usize = 256 * 1024; // 256 KB
+
+/// Emoji per space. Each one is up to [`MAX_EMOJI_IMAGE_SIZE`] on disk and,
+/// unlike attachments, emoji files are invisible to the guild storage
+/// accounting (`get_guild_storage_usage` sums `attachments` only), so nothing
+/// else bounds them: one member with MANAGE_EMOJIS could fill the disk at the
+/// per-IP write budget. 250 x 256 KB caps a space at roughly 62 MB of emoji.
+const MAX_EMOJIS_PER_GUILD: usize = 250;
+
+/// The exact character set the custom-emoji wire token allows.
+///
+/// A message references an emoji as `<:name:id>` and both the client's parser
+/// and its formatter hold the name to `[A-Za-z0-9_]{1,32}`. The upload route
+/// only bounded the length, so `"bad name!"` uploaded fine and then rendered in
+/// chat as `bad_name_` — one emoji with two names, and nothing typeable from
+/// the picker. Reject at the door instead.
+fn validate_emoji_name(name: &str) -> Result<(), ApiError> {
+    if name.is_empty() || name.chars().count() > MAX_EMOJI_NAME_LEN {
+        return Err(ApiError::BadRequest(
+            "Emoji name must be between 1 and 32 characters".into(),
+        ));
+    }
+    if !name
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    {
+        return Err(ApiError::BadRequest(
+            "Emoji name may only contain letters, numbers, and underscores".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn emoji_to_json(e: &mercury_db::emojis::EmojiRow) -> GuildEmoji {
+    GuildEmoji {
+        id: e.id.to_string(),
+        guild_id: e.guild_id.to_string(),
+        name: e.name.clone(),
+        animated: e.animated,
+        creator_id: e.creator_id.map(|id| id.to_string()),
+        created_at: e.created_at.to_rfc3339(),
+    }
+}
+
+async fn ensure_emoji_permission(
+    state: &AppState,
+    guild_id: i64,
+    user_id: i64,
+) -> Result<(), ApiError> {
+    mercury_core::permissions::ensure_guild_member(&state.db, guild_id, user_id).await?;
+    let guild = mercury_db::guilds::get_guild(&state.db, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+    // MANAGE_EMOJIS is a guild-scoped gate. This used to call
+    // `compute_channel_permissions` with the *guild* id in the channel slot;
+    // no channel has id == guild_id, so the call always errored and the handler
+    // silently fell through to `compute_permissions_from_roles`, which cannot
+    // apply the bot install-permission cap -- an installed bot with
+    // `permissions=0` still passed if any of its guild roles carried the bit.
+    // `compute_guild_permissions` is the correct primitive and applies the cap.
+    let perms = mercury_core::permissions::compute_guild_permissions(
+        &state.db,
+        guild_id,
+        guild.owner_id,
+        user_id,
+    )
+    .await?;
+    mercury_core::permissions::require_permission(perms, Permissions::MANAGE_EMOJIS)?;
+    Ok(())
+}
+
+pub async fn list_guild_emojis(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<i64>,
+) -> Result<Json<Vec<GuildEmoji>>, ApiError> {
+    mercury_core::permissions::ensure_guild_member(&state.db, guild_id, auth.user_id).await?;
+
+    let emojis = mercury_db::emojis::get_guild_emojis(&state.db, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let result: Vec<GuildEmoji> = emojis.iter().map(emoji_to_json).collect();
+    Ok(Json(result))
+}
+
+pub async fn create_emoji(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<i64>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<GuildEmoji>), ApiError> {
+    ensure_emoji_permission(&state, guild_id, auth.user_id).await?;
+
+    // Checked before the body is consumed so a space that is already at its cap
+    // never buffers the image at all.
+    let existing = mercury_db::emojis::get_guild_emojis(&state.db, guild_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+    if existing.len() >= MAX_EMOJIS_PER_GUILD {
+        return Err(ApiError::Conflict(format!(
+            "This space already has the maximum of {MAX_EMOJIS_PER_GUILD} custom emoji"
+        )));
+    }
+
+    let mut name: Option<String> = None;
+    let mut image_data: Option<Vec<u8>> = None;
+    let mut content_type: Option<String> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?
+    {
+        let field_name = field.name().unwrap_or("").to_string();
+        match field_name.as_str() {
+            "name" => {
+                let text = field
+                    .text()
+                    .await
+                    .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+                name = Some(text);
+            }
+            "image" | "file" => {
+                content_type = field.content_type().map(|s| s.to_string());
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+                image_data = Some(data.to_vec());
+            }
+            _ => {}
+        }
+    }
+
+    let name = name.ok_or_else(|| ApiError::BadRequest("Missing emoji name".into()))?;
+    let image_data =
+        image_data.ok_or_else(|| ApiError::BadRequest("Missing emoji image".into()))?;
+
+    validate_emoji_name(&name)?;
+
+    if image_data.is_empty() {
+        return Err(ApiError::BadRequest("Empty emoji image".into()));
+    }
+
+    if image_data.len() > MAX_EMOJI_IMAGE_SIZE {
+        return Err(ApiError::BadRequest(
+            "Emoji image must be under 256 KB".into(),
+        ));
+    }
+
+    let content_type =
+        content_type.ok_or_else(|| ApiError::BadRequest("Missing emoji content type".into()))?;
+
+    let (animated, ext) = match content_type.as_str() {
+        "image/png" => (false, "png"),
+        "image/gif" => (true, "gif"),
+        _ => {
+            return Err(ApiError::BadRequest(
+                "Only PNG and GIF emoji uploads are supported".into(),
+            ))
+        }
+    };
+
+    let is_valid_signature = if animated {
+        image_data.starts_with(b"GIF87a") || image_data.starts_with(b"GIF89a")
+    } else {
+        image_data.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A])
+    };
+    if !is_valid_signature {
+        return Err(ApiError::BadRequest(
+            "Emoji file contents do not match the declared image type".into(),
+        ));
+    }
+
+    // Store emoji image to disk
+    let emoji_id = mercury_util::snowflake::generate(1);
+    let storage_dir = std::path::Path::new(&state.config.storage_path).join("emojis");
+    tokio::fs::create_dir_all(&storage_dir)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let file_path = storage_dir.join(format!("{}.{}", emoji_id, ext));
+    tokio::fs::write(&file_path, &image_data)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let emoji = mercury_db::emojis::create_emoji(
+        &state.db,
+        emoji_id,
+        guild_id,
+        &name,
+        auth.user_id,
+        animated,
+    )
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let emoji_json = emoji_to_json(&emoji);
+
+    state.event_bus.dispatch(
+        "GUILD_EMOJIS_UPDATE",
+        json!({
+            "guild_id": guild_id.to_string(),
+            "emoji": serde_json::to_value(&emoji_json)
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?,
+        }),
+        Some(guild_id),
+    );
+    audit::log_action(
+        &state,
+        guild_id,
+        auth.user_id,
+        audit::ACTION_EMOJI_CREATE,
+        Some(emoji.id),
+        None,
+        Some(json!({
+            "name": emoji.name,
+            "animated": emoji.animated,
+        })),
+    )
+    .await;
+
+    Ok((StatusCode::CREATED, Json(emoji_json)))
+}
+
+pub async fn update_emoji(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((guild_id, emoji_id)): Path<(i64, i64)>,
+    Json(body): Json<UpdateEmojiRequest>,
+) -> Result<Json<GuildEmoji>, ApiError> {
+    ensure_emoji_permission(&state, guild_id, auth.user_id).await?;
+
+    validate_emoji_name(&body.name)?;
+
+    // Verify emoji belongs to guild
+    let existing = mercury_db::emojis::get_emoji(&state.db, emoji_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+
+    if existing.guild_id != guild_id {
+        return Err(ApiError::NotFound);
+    }
+
+    let updated = mercury_db::emojis::update_emoji(&state.db, emoji_id, &body.name)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    let emoji_json = emoji_to_json(&updated);
+
+    state.event_bus.dispatch(
+        "GUILD_EMOJIS_UPDATE",
+        json!({
+            "guild_id": guild_id.to_string(),
+            "emoji": serde_json::to_value(&emoji_json)
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?,
+        }),
+        Some(guild_id),
+    );
+    audit::log_action(
+        &state,
+        guild_id,
+        auth.user_id,
+        audit::ACTION_EMOJI_UPDATE,
+        Some(updated.id),
+        None,
+        Some(json!({
+            "name": updated.name,
+        })),
+    )
+    .await;
+
+    Ok(Json(emoji_json))
+}
+
+pub async fn delete_emoji(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((guild_id, emoji_id)): Path<(i64, i64)>,
+) -> Result<StatusCode, ApiError> {
+    ensure_emoji_permission(&state, guild_id, auth.user_id).await?;
+
+    // Verify emoji belongs to guild
+    let existing = mercury_db::emojis::get_emoji(&state.db, emoji_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+
+    if existing.guild_id != guild_id {
+        return Err(ApiError::NotFound);
+    }
+
+    mercury_db::emojis::delete_emoji(&state.db, emoji_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+
+    // Clean up file
+    let ext = if existing.animated { "gif" } else { "png" };
+    let file_path = std::path::Path::new(&state.config.storage_path)
+        .join("emojis")
+        .join(format!("{}.{}", emoji_id, ext));
+    let _ = tokio::fs::remove_file(file_path).await;
+
+    state.event_bus.dispatch(
+        "GUILD_EMOJIS_UPDATE",
+        json!({
+            "guild_id": guild_id.to_string(),
+            "deleted_emoji_id": emoji_id.to_string(),
+        }),
+        Some(guild_id),
+    );
+    audit::log_action(
+        &state,
+        guild_id,
+        auth.user_id,
+        audit::ACTION_EMOJI_DELETE,
+        Some(emoji_id),
+        None,
+        Some(json!({
+            "name": existing.name,
+            "animated": existing.animated,
+        })),
+    )
+    .await;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn get_emoji_image(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((guild_id, emoji_id)): Path<(i64, i64)>,
+) -> Result<axum::response::Response, ApiError> {
+    mercury_core::permissions::ensure_guild_member(&state.db, guild_id, auth.user_id).await?;
+
+    let emoji = mercury_db::emojis::get_emoji(&state.db, emoji_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?
+        .ok_or(ApiError::NotFound)?;
+
+    if emoji.guild_id != guild_id {
+        return Err(ApiError::NotFound);
+    }
+
+    let ext = if emoji.animated { "gif" } else { "png" };
+    let file_path = std::path::Path::new(&state.config.storage_path)
+        .join("emojis")
+        .join(format!("{}.{}", emoji_id, ext));
+
+    let data = tokio::fs::read(&file_path)
+        .await
+        .map_err(|_| ApiError::NotFound)?;
+
+    let content_type = if emoji.animated {
+        "image/gif"
+    } else {
+        "image/png"
+    };
+
+    use axum::http::header;
+    use axum::response::IntoResponse;
+    Ok((
+        [
+            (
+                header::CONTENT_TYPE,
+                axum::http::HeaderValue::from_static(content_type),
+            ),
+            (
+                header::CACHE_CONTROL,
+                axum::http::HeaderValue::from_static("public, max-age=31536000, immutable"),
+            ),
+            (
+                header::X_CONTENT_TYPE_OPTIONS,
+                axum::http::HeaderValue::from_static("nosniff"),
+            ),
+        ],
+        data,
+    )
+        .into_response())
+}
