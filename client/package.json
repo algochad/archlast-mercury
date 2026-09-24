@@ -22,7 +22,13 @@
     "tauri": "tauri",
     "contracts:export": "cargo run --locked -j 2 --manifest-path ../Cargo.toml -p paracord-contracts --bin export-contracts -- ../contracts/api-contracts.json",
     "contracts:generate": "npm run contracts:export && node scripts/generate-api-contracts.mjs",
-    "contracts:check": "node scripts/generate-api-contracts.mjs --check"
+    "contracts:check": "node scripts/generate-api-contracts.mjs --check",
+    "stack:up": "node scripts/stack.mjs up",
+    "stack:dev": "node scripts/stack.mjs dev",
+    "stack:down": "node scripts/stack.mjs down",
+    "stack:logs": "node scripts/stack.mjs logs",
+    "stack:reset": "node scripts/stack.mjs reset",
+    "stack:ps": "node scripts/stack.mjs ps"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,0 +1,39 @@
+# Mercury vite service (client hot reload against the compose backend).
+#
+# The Rust backend stays host-native (`cargo run --bin mercury-server
+# --no-default-features`) — compiled languages don't hot-reload usefully
+# inside containers. This service gives the web client the same treatment
+# Gaia's dockploy gives its frontend: source bind-mounted, real Vite dev
+# server with HMR, port-mapped to the host.
+#
+# Usage (backend must already run — host cargo or `npm run stack:up`):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up vite
+#   → http://127.0.0.1:1420  (proxies /api /gateway /health to the backend)
+#
+# Or via the wrapper (starts backend stack first, then vite):
+#   npm run stack:dev
+services:
+  vite:
+    image: node:22-bookworm-slim
+    container_name: mercury-vite
+    working_dir: /src/client
+    # Proxy at the backend the compose stack publishes on the host loopback.
+    # `host.docker.internal` resolves to the host gateway on Docker Desktop
+    # and on Linux with host-gateway mapping below.
+    environment:
+      VITE_DEV_PROXY_TARGET: ${VITE_DEV_PROXY_TARGET:-http://host.docker.internal:8090}
+    ports:
+      - "${VITE_DEV_PORT:-127.0.0.1:1420:1420}"
+    volumes:
+      # Client source for HMR. node_modules stays inside the image layer
+      # (anonymous volume below) so host and container installs never fight.
+      - ./client:/src/client
+      - /src/client/node_modules
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 1420 --strictPort"
+    depends_on:
+      mercury:
+        condition: service_healthy
+        required: false
+    restart: "no"
