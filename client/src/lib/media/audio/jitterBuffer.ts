@@ -12,9 +12,12 @@ export class JitterBuffer {
   private nextSequence = -1;
   private frameMs: number;
 
-  // Adaptive depth parameters
+  // Adaptive depth parameters. Floor is 40ms: one frame of cover is not
+  // enough once PLC itself reads as choppiness — a single late packet must
+  // not force a concealment burst. Default 80ms: cross-region QUIC paths
+  // idle around 30-60ms of jitter and 60ms sat exactly on the edge.
   private targetMs: number;
-  private minMs = 20;
+  private minMs = 40;
   private maxMs = 200;
   private currentDepthMs: number;
 
@@ -27,7 +30,7 @@ export class JitterBuffer {
 
   constructor(frameMs: number, targetMs?: number) {
     this.frameMs = frameMs;
-    this.targetMs = targetMs ?? 60;
+    this.targetMs = targetMs ?? 80;
     this.currentDepthMs = this.targetMs;
   }
 

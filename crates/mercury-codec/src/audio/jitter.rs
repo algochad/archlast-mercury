@@ -1,19 +1,17 @@
-// Adaptive jitter buffer (60ms target, 20-200ms range).
+// Adaptive jitter buffer (80ms target, 40-200ms range).
 
 use std::collections::BTreeMap;
 
 /// 20 ms frame duration at 48 kHz.
 const FRAME_DURATION_MS: u32 = 20;
-/// Minimum buffer depth in frames (1 frame = 20 ms).
-const MIN_DEPTH: u32 = 1;
-/// Default buffer depth in frames (3 frames = 60 ms).
-const DEFAULT_DEPTH: u32 = 3;
-/// Maximum buffer depth in frames (10 frames = 200 ms).
-const MAX_DEPTH: u32 = 10;
-/// Exponential moving average alpha for jitter estimation.
-const JITTER_ALPHA: f64 = 0.05;
-/// Maximum packets to buffer before dropping oldest.
-const MAX_BUFFERED_PACKETS: usize = 50;
+/// Minimum buffer depth in frames (2 frames = 40 ms). One frame of cover is
+/// not enough once PLC concealment itself reads as choppiness: a single late
+/// packet must not force a concealment burst.
+const MIN_DEPTH: u32 = 2;
+/// Default buffer depth in frames (4 frames = 80 ms). Cross-region QUIC paths
+/// idle around 30-60 ms of jitter; 60 ms sat exactly on the edge and every
+/// tail excursion became a PLC gap.
+const DEFAULT_DEPTH: u32 = 4;
 
 /// Statistics reported by the jitter buffer.
 #[derive(Debug, Clone, Default)]
@@ -120,10 +118,13 @@ impl<T> JitterBuffer<T> {
             self.next_seq = Some(seq);
         }
 
-        // Don't buffer packets that are too old (behind playout point)
+        // Don't buffer packets that are too old (behind playout point). The
+        // window is a full depth of frames: on a choppy path a packet arriving
+        // just after its pull is still worth keeping — dropping it turned one
+        // late packet into a PLC gap plus a wasted slot.
         if let Some(next) = self.next_seq {
             let diff = seq.wrapping_sub(next) as i16;
-            if diff < -10 {
+            if diff < -(MAX_DEPTH as i16) {
                 // Too old, discard
                 return;
             }
@@ -246,17 +247,17 @@ impl<T> JitterBuffer<T> {
     /// Adapt target buffer depth based on observed jitter.
     fn adapt_target_depth(&mut self) {
         // Map jitter estimate to target depth:
-        // < 10ms jitter -> 1 frame  (20ms)
-        // 10-30ms       -> 2 frames (40ms)
-        // 30-50ms       -> 3 frames (60ms, default)
+        // < 10ms jitter -> 2 frames (40ms, floor)
+        // 10-30ms       -> 3 frames (60ms)
+        // 30-50ms       -> 4 frames (80ms, default)
         // 50-100ms      -> 5 frames (100ms)
         // > 100ms       -> up to 10 frames (200ms)
         let new_depth = if self.jitter_estimate_ms < 10.0 {
             MIN_DEPTH
         } else if self.jitter_estimate_ms < 30.0 {
-            2
-        } else if self.jitter_estimate_ms < 50.0 {
             3
+        } else if self.jitter_estimate_ms < 50.0 {
+            DEFAULT_DEPTH
         } else if self.jitter_estimate_ms < 100.0 {
             5
         } else {
@@ -513,7 +514,6 @@ mod tests {
         // can reconstruct the lost seq-1 frame.
         assert_eq!(jb.peek_next_payload(), Some(&vec![2]));
     }
-
     #[test]
     fn max_buffer_prevents_unbounded_growth() {
         let mut jb: JitterBuffer<Vec<u8>> = JitterBuffer::new();
@@ -524,5 +524,29 @@ mod tests {
         }
 
         assert!(jb.packets.len() <= MAX_BUFFERED_PACKETS);
+    }
+
+    #[test]
+    fn default_depth_covers_cross_region_jitter() {
+        // Steady low-jitter path must settle at 80ms, not 60ms: 60 sat on the
+        // edge of real cross-region QUIC jitter and every tail became a PLC gap.
+        let jb: JitterBuffer<Vec<u8>> = JitterBuffer::new();
+        assert_eq!(jb.stats().target_latency_ms, 80);
+    }
+
+    #[test]
+    fn late_packets_within_a_depth_are_kept() {
+        // One late packet must not become a PLC gap: packets up to a full depth
+        // behind playout stay buffered.
+        let mut jb: JitterBuffer<Vec<u8>> = JitterBuffer::new();
+        jb.insert(0, 0, vec![0], 0);
+        assert_eq!(jb.pull().unwrap(), vec![0]); // now expecting seq 1
+                                                 // Seq 1 arrives 5 frames late (inside the 10-frame window).
+        for i in 2..7u16 {
+            jb.insert(i, i as u32 * 960, vec![i as u8], i as u64 * 20);
+        }
+        jb.insert(1, 960, vec![1], 200);
+        // Pulling seq 1 hits the late packet instead of PLC silence.
+        assert_eq!(jb.pull().unwrap(), vec![1]);
     }
 }

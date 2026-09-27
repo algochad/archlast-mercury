@@ -115,21 +115,46 @@ fn push_unique_url(candidates: &mut Vec<String>, raw: String) {
 /// list. The optional LAN candidate is preferred (avoids hairpin NAT), followed
 /// by the Host-derived endpoint. Shared by guild and DM voice joins so both
 /// return the identical native contract.
-pub fn native_media_endpoints(headers: &HeaderMap, media_port: u16) -> (String, Vec<String>) {
+///
+/// Prod note: behind a reverse proxy the request `Host` is the *internal*
+/// address (a Docker IP such as 172.23.0.4, which no browser can route to).
+/// The configured `public_url` (e.g. https://mercury.archlast.com) is the only
+/// host a browser can actually reach, so when it is set it wins outright and
+/// the Host-derived value is kept only as a fallback candidate.
+pub fn native_media_endpoints(
+    headers: &HeaderMap,
+    media_port: u16,
+    public_url: Option<&str>,
+) -> (String, Vec<String>) {
     let host = first_forwarded_value(headers, "x-forwarded-host")
         .or_else(|| first_forwarded_value(headers, "host"))
         .unwrap_or_else(|| format!("localhost:{}", media_port));
     let host_no_port = host.split(':').next().unwrap_or(&host);
     // Browser clients connect via WebTransport (HTTPS/HTTP3) on the unified
     // media port (same UDP port as raw QUIC, ALPN-routed).
-    let media_endpoint = format!("https://{}:{}/media", host_no_port, media_port);
+    let host_endpoint = format!("https://{}:{}/media", host_no_port, media_port);
+
+    // The public URL names the host browsers actually resolve. Strip any path
+    // and re-attach the media port + /media: the media listener is its own
+    // QUIC endpoint, not a path on the HTTPS app.
+    let public_endpoint = public_url
+        .and_then(|raw| raw.trim().trim_end_matches('/').split("://").last())
+        .map(|authority| authority.split('/').next().unwrap_or(authority))
+        .map(|authority| authority.split('@').last().unwrap_or(authority))
+        .map(|authority| authority.split(':').next().unwrap_or(authority))
+        .filter(|host| !host.is_empty())
+        .map(|host| format!("https://{}:{}/media", host, media_port));
 
     let mut candidates: Vec<String> = Vec::new();
     if let Some(local) = env_trimmed("PARACORD_NATIVE_MEDIA_LOCAL_CANDIDATE") {
         push_unique_url(&mut candidates, local);
     }
-    push_unique_url(&mut candidates, media_endpoint.clone());
-    (media_endpoint, candidates)
+    if let Some(public) = public_endpoint.clone() {
+        push_unique_url(&mut candidates, public.clone());
+        return (public, candidates);
+    }
+    push_unique_url(&mut candidates, host_endpoint.clone());
+    (host_endpoint, candidates)
 }
 
 /// Forcibly evict a user from every voice/media session in a guild.
@@ -654,9 +679,11 @@ pub async fn join_voice(
             channel.guild_id(),
         );
 
-        let (media_endpoint, media_endpoint_candidates) =
-            native_media_endpoints(&headers, state.config.native_media_port);
-
+        let (media_endpoint, media_endpoint_candidates) = native_media_endpoints(
+            &headers,
+            state.config.native_media_port,
+            state.config.public_url.as_deref(),
+        );
         let room_name = format!("{}:{}", guild_id, channel_id);
 
         let issued_at = chrono::Utc::now().timestamp();
@@ -1567,6 +1594,30 @@ mod tests {
                 let _ = write!(out, "{:02x}", byte);
                 out
             })
+    }
+
+    #[test]
+    fn native_media_prefers_public_url_over_docker_host() {
+        // Prod: the request Host is the internal Docker IP; the public URL is
+        // the only host a browser can route to.
+        let mut headers = HeaderMap::new();
+        headers.insert(header::HOST, HeaderValue::from_static("172.23.0.4:8090"));
+        let (endpoint, candidates) =
+            super::native_media_endpoints(&headers, 8443, Some("https://mercury.archlast.com"));
+        assert_eq!(endpoint, "https://mercury.archlast.com:8443/media");
+        assert_eq!(candidates, vec![endpoint]);
+    }
+
+    #[test]
+    fn native_media_falls_back_to_host_without_public_url() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::HOST,
+            HeaderValue::from_static("chat.example.com:8090"),
+        );
+        let (endpoint, candidates) = super::native_media_endpoints(&headers, 8443, None);
+        assert_eq!(endpoint, "https://chat.example.com:8443/media");
+        assert_eq!(candidates, vec![endpoint]);
     }
 
     #[test]

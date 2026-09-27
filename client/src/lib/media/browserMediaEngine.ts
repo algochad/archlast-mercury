@@ -1033,7 +1033,8 @@ export class BrowserMediaEngine implements MediaEngine {
       source.start();
       audioData.close();
     });
-    const jitterBuffer = new JitterBuffer(FRAME_MS, 60);
+    // 80ms default: cross-region QUIC jitter idles where 60ms sat on the edge.
+    const jitterBuffer = new JitterBuffer(FRAME_MS, 80);
 
     const subscription = {
       ssrc: publishedSsrc,
@@ -2701,7 +2702,8 @@ export class BrowserMediaEngine implements MediaEngine {
         sampleRate: SAMPLE_RATE,
         channels: CHANNELS,
       });
-      const jitterBuffer = new JitterBuffer(FRAME_MS, 60);
+      // 80ms default: cross-region QUIC jitter idles where 60ms sat on the edge.
+      const jitterBuffer = new JitterBuffer(FRAME_MS, 80);
 
       // Wire decoded PCM into the shared playback context so remote voice is audible.
       // Route through a per-participant GainNode so setSourceVolume can adjust gain.
@@ -3494,14 +3496,23 @@ export class BrowserMediaEngine implements MediaEngine {
     // Pull from jitter buffers and decode at 20ms intervals. Decoded PCM is
     // rendered via each decoder's onDecoded callback (wired in
     // materializeRemoteParticipant / subscribeScreenShareAudio).
+    //
+    // setInterval drifts under tab throttling: a late tick used to decode one
+    // frame and drop the backlog, so every scheduling wobble became an audible
+    // gap. Catch up (bounded: at most 2 frames per tick) so a late tick still
+    // plays continuous audio instead of chopping.
     this.playbackInterval = setInterval(() => {
       if (this.disposed || this.deafened || !this.playbackContext) return;
 
       for (const [, participant] of this.participants) {
-        const frame = participant.jitterBuffer.pull();
-        if (frame) {
+        for (let catchUp = 0; catchUp < 2; catchUp += 1) {
+          const frame = participant.jitterBuffer.pull();
+          if (!frame) break;
           const timestamp = performance.now() * 1000; // rough timestamp in us
           participant.decoder.decode(frame, timestamp);
+          // One frame per tick in the common case; the second pull only fires
+          // when the previous tick arrived late and left depth behind.
+          if (participant.jitterBuffer.stats.depth <= FRAME_MS) break;
         }
       }
 

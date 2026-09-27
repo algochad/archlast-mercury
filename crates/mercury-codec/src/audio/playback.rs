@@ -50,12 +50,13 @@ pub fn list_output_devices_raw() -> Result<Vec<(usize, String, bool)>, PlaybackE
     devices::raw_cpal_devices(Direction::Output).map_err(PlaybackError::Device)
 }
 
-/// Watermark band for playout-depth drift control (contract AU14). Kept small so
-/// end-to-end latency stays tight; the jitter buffer upstream absorbs network
-/// jitter, this only trims the accumulated drift between the sender's and this
-/// device's clocks. Expressed in milliseconds of device-rate audio.
-const DRIFT_LOW_WATERMARK_MS: usize = 40;
-const DRIFT_HIGH_WATERMARK_MS: usize = 60;
+/// Watermark band for playout-depth drift control (contract AU14). The band is
+/// deliberately wider than the jitter floor: correcting every 40-60ms of drift
+/// with a duplicated/dropped frame put a periodic click into continuous speech
+/// that read as choppiness. 80-160ms still bounds clock drift while leaving
+/// human speech untouched. Expressed in milliseconds of device-rate audio.
+const DRIFT_LOW_WATERMARK_MS: usize = 80;
+const DRIFT_HIGH_WATERMARK_MS: usize = 160;
 
 /// Internal buffer for a single audio source.
 ///

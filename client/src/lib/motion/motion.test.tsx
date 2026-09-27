@@ -379,6 +379,32 @@ describe('transitionWith', () => {
     }
   });
 
+  it('stamps one view-transition name per shared name when two surfaces match', async () => {
+    const finished = Promise.resolve();
+    const start = vi.fn((update: () => void | Promise<void>) => {
+      void update();
+      return { finished, ready: Promise.resolve() };
+    });
+    (document as unknown as { startViewTransition?: unknown }).startViewTransition = start;
+    try {
+      // Sidebar row and lobby card for the same room, both in the document.
+      markedElement('room-3625', { left: 0, top: 0 });
+      markedElement('room-3625', { left: 500, top: 0 });
+      const stampedDuring: string[][] = [];
+      await transitionWith(() => {
+        stampedDuring.push(
+          [...document.querySelectorAll<HTMLElement>('[data-motion-shared]')]
+            .map((el) => el.style.viewTransitionName)
+            .filter(Boolean),
+        );
+      }, { chrome: false, names: ['room-3625'] });
+      // Exactly one element carried pc-room-3625 during the transition.
+      expect(stampedDuring.flat().filter((name) => name === 'pc-room-3625')).toHaveLength(1);
+    } finally {
+      delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
+    }
+  });
+
   it('just runs the update under reduced motion', async () => {
     stubMatchMedia(true);
     configureMotion('system');

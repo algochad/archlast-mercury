@@ -182,6 +182,14 @@ export interface ServerConnection {
   reconnectAttempts: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   allowReconnect: boolean;
+  /**
+   * Consecutive realtime transport failures without a successful frame. A QUIC
+   * path failure (ERR_QUIC_PROTOCOL_ERROR / QUIC_TOO_MANY_RTOS) kills the SSE
+   * stream the same way a TCP reset does, except the browser reports it as an
+   * opaque error event — so count failures and back off rather than hammering
+   * the same broken path at 0ms. Optional so older test doubles still typecheck.
+   */
+  transportFailures?: number;
   connected: boolean;
   connecting: boolean;
   lastHeartbeatSentAtMs: number;
@@ -995,6 +1003,7 @@ class ConnectionManager {
       realtimeCursor: null,
       reconnectAttempts: 0,
       reconnectTimer: null,
+      transportFailures: 0,
       allowReconnect: true,
       connected: false,
       connecting: false,
@@ -1254,6 +1263,7 @@ class ConnectionManager {
       realtimeCursor: null,
       reconnectAttempts: 0,
       reconnectTimer: null,
+      transportFailures: 0,
       allowReconnect: true,
       connected: false,
       connecting: false,
@@ -1496,6 +1506,7 @@ class ConnectionManager {
           // reset the watchdog before attempting to decode it.
           conn.lastFrameTs = Date.now();
           conn.missedAcks = 0;
+          conn.transportFailures = 0;
           let payload: DispatchPayload;
           try { payload = JSON.parse(rawData); }
           catch { warnMalformedFrame('sse', rawData); return; }
@@ -1514,11 +1525,15 @@ class ConnectionManager {
             logVoiceDiagnostic('[gateway] SSE error on a superseded stream', { server: conn.serverId });
             return;
           }
+          // The browser never names the QUIC failure in the event — count it so
+          // the reconnect backs off instead of re-hitting a dead path at 0ms.
+          conn.transportFailures = (conn.transportFailures ?? 0) + 1;
           logVoiceDiagnostic('[gateway] SSE error', {
             server: conn.serverId,
             readyState: es.readyState,
             wasConnected: conn.connected,
             type: (errEvt as Event)?.type,
+            transportFailures: conn.transportFailures,
           });
           conn.connecting = false;
           conn.connected = false;
@@ -1997,12 +2012,19 @@ class ConnectionManager {
       this.syncUiConnectionStatus();
       return;
     }
+    // QUIC path failures kill the stream opaquely (the browser surfaces only a
+    // bare error event, e.g. QUIC_TOO_MANY_RTOS after the path gives up). The
+    // first retry stays immediate so a transient reset is invisible; a stream
+    // that keeps dying backs off so it stops hammering a broken path — and the
+    // reconnect re-runs the session+ticket handshake, so no stale ticket is
+    // ever reused.
+    const transportPenalty = Math.min(conn.transportFailures ?? 0, 4) * 1000;
     // First retry is immediate (0ms) so intermittent TLS/SSE resets
     // are invisible to the user.  Subsequent retries use exponential
     // backoff starting at 1s up to 30s.
     const attempt = conn.reconnectAttempts;
     conn.reconnectAttempts++;
-    if (attempt === 0) {
+    if (attempt === 0 && transportPenalty === 0) {
       // Immediate retry — use setTimeout(0) so the call stack unwinds
       // but there is essentially no delay.
       conn.reconnectTimer = setTimeout(() => {
@@ -2012,7 +2034,7 @@ class ConnectionManager {
         this.connectRealtime(conn);
       }, 0);
     } else {
-      const delay = Math.min(1000 * Math.pow(2, Math.min(attempt - 1, 5)), 30000);
+      const delay = Math.min(1000 * Math.pow(2, Math.min(attempt - 1, 5)), 30000) + transportPenalty;
       conn.reconnectTimer = setTimeout(() => {
         conn.reconnectTimer = null;
         if (!conn.allowReconnect) return;

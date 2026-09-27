@@ -67,8 +67,11 @@ pub async fn transport_diagnostics(
         })));
     }
 
-    let (media_endpoint, media_endpoint_candidates) =
-        super::voice::native_media_endpoints(&headers, state.config.native_media_port);
+    let (media_endpoint, media_endpoint_candidates) = super::voice::native_media_endpoints(
+        &headers,
+        state.config.native_media_port,
+        state.config.public_url.as_deref(),
+    );
     let certificate_pin_sha256 = state
         .native_media
         .as_ref()

@@ -132,12 +132,14 @@ export const QuietRoomRow = memo(function QuietRoomRow({
   return (
     <NavRow
       {...rowProps({ navIndex, tabStop, active, room })}
-      data-motion-shared={roomSharedName(room.channelId)}
+      // Same as LiveRoomRowView below: the open Stage carries this name, so an
+      // active row must not carry it too.
+      data-motion-shared={active ? undefined : roomSharedName(room.channelId)}
       active={active}
       display={room.kind === 'voice'}
       icon={<WindowDot room={room} />}
       trailing={<RoomTrailing room={room} attention={attention} />}
-      onClick={(event) => onOpen(room, event.currentTarget.closest('[data-motion-shared]'))}
+      onClick={(event) => onOpen(room, event.currentTarget.closest('[data-motion-shared]') ?? event.currentTarget)}
       onContextMenu={onContextMenu ? (event) => onContextMenu(event, room) : undefined}
       className={cn('group', unread && 'text-text-primary')}
     >
@@ -168,7 +170,10 @@ export const LiveRoomRowView = memo(function LiveRoomRowView({
     <button
       type="button"
       {...rowProps({ navIndex, tabStop, active, room })}
-      data-motion-shared={roomSharedName(room.channelId)}
+      // The active row and the open Stage share one view-transition name; keep
+      // the mark off the active row so the before-pass stamps exactly one
+      // element per name (duplicate `pc-room-*` aborted the transition).
+      data-motion-shared={active ? undefined : roomSharedName(room.channelId)}
       data-selected-row={active || undefined}
       onClick={(event) => onOpen(room, event.currentTarget)}
       onContextMenu={onContextMenu ? (event) => onContextMenu(event, room) : undefined}

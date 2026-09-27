@@ -129,10 +129,9 @@ pub async fn create_dm(
         return Err(ApiError::Forbidden);
     }
 
-    let are_friends =
-        mercury_db::relationships::are_friends(&state.db, auth.user_id, recipient_id)
-            .await
-            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
+    let are_friends = mercury_db::relationships::are_friends(&state.db, auth.user_id, recipient_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
     let share_guild = mercury_db::members::share_any_guild(&state.db, auth.user_id, recipient_id)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e.to_string())))?;
@@ -504,8 +503,11 @@ pub async fn join_dm_voice(
         super::voice::release_previous_memberships(&state, auth.user_id, &previous_memberships)
             .await;
 
-        let (media_endpoint, media_endpoint_candidates) =
-            super::voice::native_media_endpoints(&headers, state.config.native_media_port);
+        let (media_endpoint, media_endpoint_candidates) = super::voice::native_media_endpoints(
+            &headers,
+            state.config.native_media_port,
+            state.config.public_url.as_deref(),
+        );
 
         let issued_at = chrono::Utc::now().timestamp();
         let media_claims = json!({

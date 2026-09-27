@@ -116,6 +116,24 @@ function collect(
   return found;
 }
 
+/**
+ * Stamp one unique `view-transition-name` per shared name.
+ *
+ * `collect` already keeps first-wins per name, but the live DOM can carry the
+ * same `data-motion-shared` on several surfaces at once (sidebar row, lobby
+ * card, on-air pill, stage tile). The old loop stamped every match, so the
+ * browser saw `pc-room-<id>` twice and logged "Unexpected duplicate
+ * view-transition-name" while animating neither. Stamping one element per name
+ * is the whole fix; the origin still wins its own name via `collect`.
+ */
+function stampUniqueViewTransitionNames(collected: Map<string, HTMLElement>): void {
+  // `collect` is already first-wins per name, so iterating the map stamps each
+  // name exactly once. The old code stamped every raw querySelectorAll match,
+  // which is how the same `pc-room-<id>` landed on two elements at once.
+  for (const [name, el] of collected) {
+    el.style.viewTransitionName = `pc-${name.replace(/[^\w-]/g, '-')}`;
+  }
+}
 /** Stamp the journey on `<html>` so CSS can dress it, and hand back the undo. */
 function stampKind(kind: string | undefined): () => void {
   if (!kind || typeof document === 'undefined') return () => {};
@@ -270,7 +288,7 @@ export async function transitionWith(
 
   if (engine === 'view-transition' && typeof doc.startViewTransition === 'function') {
     const before = collect(root, options.names, options.origin);
-    for (const [name, el] of before) el.style.viewTransitionName = `pc-${name.replace(/[^\w-]/g, '-')}`;
+    stampUniqueViewTransitionNames(before);
     options.beforeUpdate?.('view-transition');
     const transition = doc.startViewTransition(async () => {
       await update();
@@ -278,7 +296,7 @@ export async function transitionWith(
       const into = destinationOf(root, options.destinationRoot);
       await waitForDestination(into, options.names, options.origin, nextTask);
       const after = collect(into, options.names, null, options.origin);
-      for (const [name, el] of after) el.style.viewTransitionName = `pc-${name.replace(/[^\w-]/g, '-')}`;
+      stampUniqueViewTransitionNames(after);
     });
     // **Both of these promises reject in ordinary use**, and neither rejection
     // is an error the person needs to hear about. `ready` rejects whenever the
