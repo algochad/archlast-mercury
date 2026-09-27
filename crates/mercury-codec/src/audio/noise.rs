@@ -50,12 +50,9 @@ impl NoiseSuppressor {
         for chunk in pcm.chunks(DENOISE_FRAME_SIZE) {
             if chunk.len() == DENOISE_FRAME_SIZE {
                 let mut frame = [0.0f32; DENOISE_FRAME_SIZE];
-                // nnnoiseless expects samples scaled to i16 range; round into the
-                // symmetric range so the quantisation error stays unbiased.
+                // nnnoiseless expects samples scaled to i16 range (-32768..32767)
                 for (i, &s) in chunk.iter().enumerate() {
-                    frame[i] = (s.clamp(-1.0, 1.0) * 32768.0)
-                        .round()
-                        .clamp(-32768.0, 32767.0);
+                    frame[i] = s * 32767.0;
                 }
 
                 let mut out_frame = [0.0f32; DENOISE_FRAME_SIZE];
@@ -63,7 +60,7 @@ impl NoiseSuppressor {
 
                 // Scale back to f32 range (-1.0..1.0)
                 for &s in &out_frame {
-                    output.push((s / 32768.0).clamp(-1.0, 1.0));
+                    output.push(s / 32767.0);
                 }
             } else {
                 // Partial chunk at end: pass through unprocessed

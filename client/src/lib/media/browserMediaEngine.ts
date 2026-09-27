@@ -97,38 +97,6 @@ function canvasViewport(canvas: HTMLCanvasElement): { width: number; height: num
     height: Math.max(1, Math.round((canvas.clientHeight || canvas.height || 1) * ratio)),
   };
 }
-export interface VoiceDspToggles {
-  echoCancellation: boolean;
-  noiseSuppression: boolean;
-  autoGainControl: boolean;
-}
-
-export const DEFAULT_VOICE_DSP_TOGGLES: VoiceDspToggles = {
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: false,
-};
-
-export function readBooleanSetting(value: unknown, defaultValue: boolean): boolean {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value !== 0;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') return true;
-    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') return false;
-  }
-  return defaultValue;
-}
-
-export function normalizeVoiceDspToggles(value: unknown): VoiceDspToggles {
-  const prefs = (value ?? {}) as Record<string, unknown>;
-  return {
-    echoCancellation: readBooleanSetting(prefs['echoCancellation'], DEFAULT_VOICE_DSP_TOGGLES.echoCancellation),
-    noiseSuppression: readBooleanSetting(prefs['noiseSuppression'], DEFAULT_VOICE_DSP_TOGGLES.noiseSuppression),
-    autoGainControl: readBooleanSetting(prefs['autoGainControl'], DEFAULT_VOICE_DSP_TOGGLES.autoGainControl),
-  };
-}
-
 
 const VP9_CODEC = 'vp09.00.10.08';
 const H264_CODEC = 'avc1.640028';
@@ -560,7 +528,6 @@ export class BrowserMediaEngine implements MediaEngine {
   private disconnecting = false;
   private disposed = false;
   private account?: OperationContext;
-  private voiceDspToggles: VoiceDspToggles = { ...DEFAULT_VOICE_DSP_TOGGLES };
   private membershipSessionId: string | null = null;
   private disposePromise: Promise<void> | null = null;
   private removeAbortListener: (() => void) | null = null;
@@ -594,7 +561,6 @@ export class BrowserMediaEngine implements MediaEngine {
     this.assertOpen();
     if (session) {
       this.account = session.account;
-      this.voiceDspToggles = normalizeVoiceDspToggles(session.voiceDspToggles);
       const abort = () => { void this.disconnect(); };
       session.signal.addEventListener('abort', abort, { once: true });
       this.removeAbortListener = () => session.signal.removeEventListener('abort', abort);
@@ -1561,18 +1527,13 @@ export class BrowserMediaEngine implements MediaEngine {
   // ---------- Audio capture pipeline (unchanged) ----------
 
   private async setupAudioCapture(): Promise<void> {
-    // Honor the user's saved DSP toggles (Settings → Voice → Processing), passed
-    // on the session context at join time. Hardcoding all three to true made the
-    // AGC toggle a no-op and stacked browser AGC on top of the native one —
-    // hiss under speech.
-    const prefs = this.voiceDspToggles;
     const acquired = await navigator.mediaDevices.getUserMedia({
       audio: {
         sampleRate: SAMPLE_RATE,
         channelCount: CHANNELS,
-        echoCancellation: prefs.echoCancellation,
-        noiseSuppression: prefs.noiseSuppression,
-        autoGainControl: prefs.autoGainControl,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
       },
     });
 
