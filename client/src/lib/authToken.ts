@@ -16,7 +16,8 @@ const SECURE_REFRESH_TOKEN_KEY = 'paracord:auth:refresh-token';
 // can purge any value/key material left behind by those older builds.
 const WRAPPED_REFRESH_TOKEN_KEY = 'paracord:auth:refresh-token';
 const WRAP_KEY_DB = 'paracord-auth';
-const CSRF_COOKIE_NAME = 'paracord_csrf';
+const CSRF_COOKIE_NAME = 'mercury_csrf';
+const LEGACY_CSRF_COOKIE_NAME = 'paracord_csrf';
 // The refresh cookie is HttpOnly, so a cold page load cannot see whether this
 // browser holds a session — it used to find out by asking, which answered 401
 // for every first-time visitor, once per page view, in the browser console and
@@ -104,22 +105,34 @@ export function getCsrfToken(): string | null {
     return null;
   }
   const cookies = document.cookie.split(';');
+  let mercuryValue: string | null = null;
+  let legacyValue: string | null = null;
   for (const cookie of cookies) {
     const [name, ...rest] = cookie.trim().split('=');
-    if (name !== CSRF_COOKIE_NAME) {
+    if (name !== CSRF_COOKIE_NAME && name !== LEGACY_CSRF_COOKIE_NAME) {
       continue;
     }
-    const value = rest.join('=').trim();
-    if (!value) {
-      return null;
+    const raw = rest.join('=').trim();
+    if (!raw) {
+      continue;
     }
+    let decoded: string;
     try {
-      return decodeURIComponent(value);
+      decoded = decodeURIComponent(raw);
     } catch {
-      return value;
+      decoded = raw;
+    }
+    if (!decoded) {
+      continue;
+    }
+    if (name === CSRF_COOKIE_NAME && mercuryValue === null) {
+      mercuryValue = decoded;
+    } else if (name === LEGACY_CSRF_COOKIE_NAME && legacyValue === null) {
+      legacyValue = decoded;
     }
   }
-  return null;
+  // Prefer the rebranded cookie; fall back to the legacy name for rolling deploys.
+  return mercuryValue ?? legacyValue;
 }
 
 export function setAccessToken(token: string | null): void {
