@@ -14,7 +14,10 @@ services:
     image: ghcr.io/algochad/archlast-mercury:latest
     pull_policy: ${PARACORD_PULL_POLICY:-build}
     build: ${PARACORD_BUILD_CONTEXT:-.}
-    container_name: paracord
+    # No `container_name`: Coolify/Gaia suffixed this deployment's containers
+    # (mercury-…-…) and the retry collided with the pinned name
+    # ("postgres-… is already in use"). Compose generates stable
+    # project-scoped names; service DNS (mercury, postgres, livekit) is unchanged.
     ports:
       # HTTP API + WebSocket gateway. Default is loopback-only for bare-metal safety.
       # For Coolify (Traefik routes to the container), either:
@@ -105,7 +108,6 @@ services:
   # PARACORD_VOICE_NATIVE_MEDIA=false on the mercury service to route through it).
   livekit:
     image: livekit/livekit-server:v1.9.11
-    container_name: paracord-livekit
     profiles: ["livekit"]
     ports:
       # Published to the HOST LOOPBACK ONLY (127.0.0.1) so the media server is
@@ -135,7 +137,7 @@ services:
   # at it (see docs/coolify.md); then remove this service or leave it stopped.
   postgres:
     image: postgres:16-alpine
-    container_name: mercury-postgres
+    # (no container_name — see mercury service note above)
     environment:
       POSTGRES_DB: mercury
       POSTGRES_USER: mercury
