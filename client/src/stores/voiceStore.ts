@@ -3275,6 +3275,11 @@ async function performCallJoin(owner: CallSession, previousMute: boolean, previo
               id: owner.id,
               signal: owner.signal,
               account: owner.context,
+              // Snapshot the owning account's saved DSP toggles so the browser
+              // engine's getUserMedia honors Settings → Voice → Processing
+              // (AGC off by default — stacking browser AGC over native AGC was
+              // the hiss under speech).
+              voiceDspToggles: { ...owner.preferences },
               // The join response's pin is correct now; a reconnect minutes or
               // hours later may not be, because the server rotates its media
               // certificate. Let the engine re-read it rather than replay it.

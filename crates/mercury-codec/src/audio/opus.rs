@@ -49,7 +49,7 @@ impl OpusEncoder {
     /// - Voip application (voice-optimized)
     /// - 96 kbps default bitrate
     /// - FEC enabled for packet loss resilience
-    /// - DTX enabled for silence suppression
+    /// - DTX off (comfort-noise gating reads as static between syllables)
     /// - Complexity 9 (this trades CPU, not latency — Opus's algorithmic delay
     ///   is fixed by the frame/lookahead, independent of the complexity knob)
     pub fn new() -> Result<Self, OpusError> {
@@ -63,8 +63,10 @@ impl OpusEncoder {
         // Enable in-band FEC
         encoder.set_inband_fec(true)?;
 
-        // Enable DTX (discontinuous transmission) for silence suppression
-        encoder.set_dtx(true)?;
+        // DTX stays OFF on the voice path: discontinuous transmission gates
+        // quiet frames to comfort-noise bursts that read as static between
+        // syllables (the stream-audio encoder already runs with DTX off).
+        encoder.set_dtx(false)?;
 
         // Set expected packet loss percentage for FEC tuning
         encoder.set_packet_loss_perc(10u8)?;

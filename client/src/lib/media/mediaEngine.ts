@@ -126,6 +126,12 @@ export interface MediaSessionContext {
   readonly signal: AbortSignal;
   readonly account?: OperationContext;
   /**
+   * The owning account's saved voice DSP toggles (Settings → Voice →
+   * Processing), normalized at join time. The browser engine applies them to
+   * its getUserMedia constraints; unset means engine defaults.
+   */
+  readonly voiceDspToggles?: { echoCancellation?: unknown; noiseSuppression?: unknown; autoGainControl?: unknown };
+  /**
    * Re-read the media certificate pin the server publishes right now.
    *
    * The pin handed to {@link MediaEngine.connect} comes from the join response

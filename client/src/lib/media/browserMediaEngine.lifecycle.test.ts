@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BrowserMediaEngine } from './browserMediaEngine';
 import { WebTransportManager } from './transport/webTransport';
+import { normalizeVoiceDspToggles } from './browserMediaEngine';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -12,6 +13,43 @@ function capturedStream() {
   return { stop, stream: { getTracks: () => [{ stop }] } as unknown as MediaStream };
 }
 afterEach(() => vi.unstubAllGlobals());
+
+describe('BrowserMediaEngine voice DSP toggles', () => {
+  it('normalizes saved toggles with AGC off by default', () => {
+    expect(normalizeVoiceDspToggles(undefined)).toEqual({
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: false,
+    });
+  });
+
+  it('honors explicit saved toggles', () => {
+    expect(
+      normalizeVoiceDspToggles({ echoCancellation: false, noiseSuppression: false, autoGainControl: true }),
+    ).toEqual({ echoCancellation: false, noiseSuppression: false, autoGainControl: true });
+  });
+
+  it('applies saved toggles to getUserMedia constraints', async () => {
+    const getUserMedia = vi.fn().mockRejectedValue(new Error('no capture in tests'));
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+    const engine = new BrowserMediaEngine();
+    // Simulate the join-time snapshot voiceStore passes on the session context.
+    (engine as unknown as { voiceDspToggles: unknown }).voiceDspToggles = normalizeVoiceDspToggles({
+      echoCancellation: false,
+      noiseSuppression: true,
+      autoGainControl: false,
+    });
+    await (engine as unknown as { setupAudioCapture(): Promise<void> }).setupAudioCapture().catch(() => {});
+    expect(getUserMedia).toHaveBeenCalledWith({
+      audio: expect.objectContaining({
+        echoCancellation: false,
+        noiseSuppression: true,
+        autoGainControl: false,
+      }),
+    });
+    await engine.disconnect();
+  });
+});
 
 describe('BrowserMediaEngine late permission results', () => {
   it('stops a microphone granted after disconnect without constructing an audio context', async () => {

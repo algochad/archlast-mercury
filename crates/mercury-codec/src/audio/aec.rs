@@ -54,13 +54,14 @@ const FILTER_LENGTH: c_int = (SAMPLE_RATE as c_int) / 10;
 
 /// AGC target level: RMS of ~-18 dBFS, i.e. `10^(-18/20)` (contract AEC2).
 const AGC_TARGET_RMS: f32 = 0.125_892_54;
-/// Conservative gain ceiling (+20 dB) so quiet noise is never boosted to full
-/// scale, and floor (-12 dB) so loud input is tamed rather than clipped.
-const AGC_MAX_GAIN: f32 = 10.0;
+/// Gain ceiling (+10 dB): quiet-room hiss must never be boosted to full scale.
+/// +20 dB pumped interface/fan noise into audible static under speech.
+const AGC_MAX_GAIN: f32 = 3.162_277_7;
+/// Floor (-12 dB) so loud input is tamed rather than clipped.
 const AGC_MIN_GAIN: f32 = 0.251_188_64;
-/// Noise gate (~-50 dBFS RMS): below this the frame is treated as silence/noise
+/// Noise gate (~-45 dBFS RMS): below this the frame is treated as silence/noise
 /// and the gain is held, so the AGC never pumps up a quiet background.
-const AGC_GATE_RMS: f32 = 0.003_162_278;
+const AGC_GATE_RMS: f32 = 0.005_623_413;
 /// Per-frame smoothing toward the desired gain. Decreasing gain (signal got
 /// louder) reacts faster to avoid clipping; increasing gain is slow to avoid
 /// audible pumping. Both are gentle (contract AEC2: conservative).
@@ -329,14 +330,18 @@ fn soft_clip(sample: f32) -> f32 {
 #[inline]
 fn f32_to_i16(src: &[f32], dst: &mut [i16]) {
     for (d, &s) in dst.iter_mut().zip(src.iter()) {
-        *d = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
+        // Round (not truncate) into the symmetric i16 range: truncation added a
+        // -0.5 LSB DC bias that the AGC then boosted into audible hiss.
+        *d = (s.clamp(-1.0, 1.0) * 32767.0)
+            .round()
+            .clamp(-32768.0, 32767.0) as i16;
     }
 }
 
 #[inline]
 fn i16_to_f32(src: &[i16], dst: &mut [f32]) {
     for (d, &s) in dst.iter_mut().zip(src.iter()) {
-        *d = s as f32 / 32767.0;
+        *d = s as f32 / 32768.0;
     }
 }
 
@@ -345,7 +350,9 @@ fn i16_to_f32(src: &[i16], dst: &mut [f32]) {
 fn fill_i16_from_f32(src: &[f32], dst: &mut [i16]) {
     let n = src.len().min(dst.len());
     for i in 0..n {
-        dst[i] = (src[i].clamp(-1.0, 1.0) * 32767.0) as i16;
+        dst[i] = (src[i].clamp(-1.0, 1.0) * 32767.0)
+            .round()
+            .clamp(-32768.0, 32767.0) as i16;
     }
     for d in dst.iter_mut().skip(n) {
         *d = 0;
